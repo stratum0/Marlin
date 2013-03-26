@@ -56,7 +56,7 @@
 //User specified version info of THIS file to display in [Pronterface, etc] terminal window during startup.
 //Implementation of an idea by Prof Braino to inform user that any changes made
 //to THIS file by the user have been successfully uploaded into firmware.
-#define STRING_VERSION_CONFIG_H "2013-03-22-RJ" //Personal revision number for changes to THIS file.
+#define STRING_VERSION_CONFIG_H "2013-03-26-RJ" //Personal revision number for changes to THIS file.
 #define STRING_CONFIG_H_AUTHOR "RepRapPro" //Who made the changes.
 
 // This determines the communication speed of the printer
@@ -272,7 +272,7 @@ const bool Z_ENDSTOPS_INVERTING = false; // set to true to invert the logic of t
 
 // default settings 
 // X, Y, Z, E steps per mm
-#define DEFAULT_AXIS_STEPS_PER_UNIT   {3200/17/2.032, 3200/17/2.032, 4000, 660} 
+#define DEFAULT_AXIS_STEPS_PER_UNIT   {92.635, 92.635, 4000, 660} 
 
 // Defaults changed by the G10 command
 
