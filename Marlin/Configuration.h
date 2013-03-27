@@ -111,11 +111,20 @@
 
 
 #ifdef REPRAPPRO_MENDEL
-// RS 484-0149; EPCOS B57550G103J
-#define BED_BETA 3480.0
+
+
+//// RS 484-0149; EPCOS B57550G103J All Mendels and Thermistors shipped before 1/4/13
+//#define BED_BETA 3480.0
+//#define BED_RS SERIAL_R
+//#define BED_NTC 10000.0
+//#define BED_R_INF ( BED_NTC*exp(-BED_BETA/298.15) )
+
+// Rapid 61-0446 ; Semitec 103GT-2 All Mendels and Thermistors shipped after 1/4/13
+#define BED_BETA 4126.0
 #define BED_RS SERIAL_R
 #define BED_NTC 10000.0
 #define BED_R_INF ( BED_NTC*exp(-BED_BETA/298.15) )
+
 #endif
 
 #ifdef REPRAPPRO_HUXLEY
