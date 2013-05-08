@@ -9,8 +9,8 @@
 
 // Uncomment ONE of the next three lines - the one for your RepRap machine
 //#define REPRAPPRO_HUXLEY
-#define REPRAPPRO_MENDEL
-//#define REPRAPPRO_WALLACE
+//#define REPRAPPRO_MENDEL //Legacy Mendel
+#define REPRAPPRO_MENDEL2 //Tricolour and Mono
 
 // Uncomment ONE of the next two lines - the one for your master controller electronics
 #define REPRAPPRO_MELZI
@@ -27,8 +27,8 @@
 
 #ifndef REPRAPPRO_HUXLEY
 #ifndef REPRAPPRO_MENDEL
-#ifndef REPRAPPRO_WALLACE
-#error Uncomment one of #define REPRAPPRO_HUXLEY, REPRAPPRO_MENDEL or REPRAPPRO_WALLACE at the start of the file Configuration.h
+#ifndef REPRAPPRO_MENDEL2
+#error Uncomment one of #define REPRAPPRO_HUXLEY, REPRAPPRO_MENDEL, or REPRAPPRO_MENDEL2 at the start of the file Configuration.h
 #endif
 #endif
 #endif
@@ -56,7 +56,7 @@
 //User specified version info of THIS file to display in [Pronterface, etc] terminal window during startup.
 //Implementation of an idea by Prof Braino to inform user that any changes made
 //to THIS file by the user have been successfully uploaded into firmware.
-#define STRING_VERSION_CONFIG_H "2013-03-26-RJ" //Personal revision number for changes to THIS file.
+#define STRING_VERSION_CONFIG_H "2013-05-08-RJ" //Personal revision number for changes to THIS file.
 #define STRING_CONFIG_H_AUTHOR "RepRapPro" //Who made the changes.
 
 // This determines the communication speed of the printer
@@ -111,16 +111,8 @@
 
 
 #ifdef REPRAPPRO_MENDEL
-
-
-//// RS 484-0149; EPCOS B57550G103J All Mendels and Thermistors shipped before 1/4/13
-//#define BED_BETA 3480.0
-//#define BED_RS SERIAL_R
-//#define BED_NTC 10000.0
-//#define BED_R_INF ( BED_NTC*exp(-BED_BETA/298.15) )
-
-// Rapid 61-0446 ; Semitec 103GT-2 All Mendels and Thermistors shipped after 1/4/13
-#define BED_BETA 4126.0
+// Bed thermistor: RS 484-0149; EPCOS B57550G103J
+#define BED_BETA 3480.0
 #define BED_RS SERIAL_R
 #define BED_NTC 10000.0
 #define BED_R_INF ( BED_NTC*exp(-BED_BETA/298.15) )
@@ -133,6 +125,14 @@
 #define BED_RS SERIAL_R
 #define BED_NTC 100000.0
 #define BED_R_INF ( BED_NTC*exp(-BED_BETA/298.15) )
+#endif
+
+#ifdef REPRAPPRO_MENDEL2
+// Rapid 61-0446 ; Semitec 103GT-2 All Mendels and Thermistors shipped after 1/4/13
+ #define BED_BETA 4126.0
+ #define BED_RS SERIAL_R
+ #define BED_NTC 10000.0
+ #define BED_R_INF ( BED_NTC*exp(-BED_BETA/298.15) )
 #endif
 
 
@@ -223,6 +223,17 @@ const bool Z_ENDSTOPS_INVERTING = false; // set to true to invert the logic of t
 #define DISABLE_E false // For all extruders
 
 #ifdef REPRAPPRO_MENDEL
+#define AXES_MAX_LENGTHS {210, 210, 140}
+#define INVERT_X_DIR false    // for Mendel set to false, for Orca set to true
+#define INVERT_Y_DIR true    // for Mendel set to true, for Orca set to false
+#define INVERT_Z_DIR false     // for Mendel set to false, for Orca set to true
+#define INVERT_E0_DIR true   // for direct drive extruder v9 set to true, for geared extruder set to false
+#define INVERT_E1_DIR true    // for direct drive extruder v9 set to true, for geared extruder set to false
+#define INVERT_E2_DIR true   // for direct drive extruder v9 set to true, for geared extruder set to false
+#endif
+
+#ifdef REPRAPPRO_MENDEL2
+#define AXES_MAX_LENGTHS {210, 210, 140}
 #define INVERT_X_DIR true    // for Mendel set to false, for Orca set to true
 #define INVERT_Y_DIR true    // for Mendel set to true, for Orca set to false
 #define INVERT_Z_DIR false     // for Mendel set to false, for Orca set to true
@@ -232,6 +243,7 @@ const bool Z_ENDSTOPS_INVERTING = false; // set to true to invert the logic of t
 #endif
 
 #ifdef REPRAPPRO_HUXLEY
+#define AXES_MAX_LENGTHS {155, 150, 90}
 #define INVERT_X_DIR true    // for Mendel set to false, for Orca set to true
 #define INVERT_Y_DIR false    // for Mendel set to true, for Orca set to false
 #define INVERT_Z_DIR false     // for Mendel set to false, for Orca set to true
@@ -260,22 +272,40 @@ const bool Z_ENDSTOPS_INVERTING = false; // set to true to invert the logic of t
 
 #ifdef REPRAPPRO_MENDEL
 
-#define AXES_MAX_LENGTHS {210, 210, 140}
+#define X_MAX_LENGTH 210  
+#define Y_MAX_LENGTH 210
+#define Z_MAX_LENGTH 110
 #define HOMING_FEEDRATE {10*60, 10*60, 1*60, 0}  // set the homing speeds (mm/min)
-#define FAST_HOME_FEEDRATE {50*60, 50*60, 3*60, 0}  // set the homing speeds (mm/min)
+#define FAST_HOME_FEEDRATE {50*60, 50*60, 1*60, 0}  // set the homing speeds (mm/min)
 #define DEFAULT_MAX_FEEDRATE  {500, 500, 3, 45}
 #define DEFAULT_MAX_FEEDRATE          {300, 300, 3, 45}    // (mm/sec)    
-#define DEFAULT_MAX_ACCELERATION      {800,800,30,800}    // X, Y, Z, E maximum start speed for accelerated moves. E default values
+#define DEFAULT_MAX_ACCELERATION      {800,800,30,250}    // X, Y, Z, E maximum start speed for accelerated moves. E default values
 
 #else
 
-#define AXES_MAX_LENGTHS {155, 150, 90}
+#ifdef REPRAPPRO_MENDEL2
+
+#define X_MAX_LENGTH 210  
+#define Y_MAX_LENGTH 210
+#define Z_MAX_LENGTH 110
 #define HOMING_FEEDRATE {10*60, 10*60, 1*60, 0}  // set the homing speeds (mm/min)
-#define FAST_HOME_FEEDRATE {80*60, 80*60, 3*60, 0}  // set the homing speeds (mm/min)
+#define FAST_HOME_FEEDRATE {50*60, 50*60, 1*60, 0}  // set the homing speeds (mm/min)
+#define DEFAULT_MAX_FEEDRATE  {500, 500, 3, 45}
+#define DEFAULT_MAX_FEEDRATE          {300, 300, 3, 45}    // (mm/sec)    
+#define DEFAULT_MAX_ACCELERATION      {800,800,30,250}    // X, Y, Z, E maximum start speed for accelerated moves. E default values
+
+#else
+
+#define X_MAX_LENGTH 155
+#define Y_MAX_LENGTH 150
+#define Z_MAX_LENGTH 90
+#define HOMING_FEEDRATE {10*60, 10*60, 1*60, 0}  // set the homing speeds (mm/min)
+#define FAST_HOME_FEEDRATE {80*60, 80*60, 4*60, 0}  // set the homing speeds (mm/min)
 #define DEFAULT_MAX_FEEDRATE  {500, 500, 5, 45}    // (mm/sec)
 #define DEFAULT_MAX_FEEDRATE          {500, 500, 5, 45}    // (mm/sec)    
-#define DEFAULT_MAX_ACCELERATION      {1000,1000,50,1000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values
+#define DEFAULT_MAX_ACCELERATION      {1000,1000,50,250}    // X, Y, Z, E maximum start speed for accelerated moves. E default values
 
+#endif
 #endif
 
 
