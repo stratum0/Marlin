@@ -12,6 +12,8 @@
 
 #define REPRAPPRO_MULTIMATERIALS
 
+#define VERSION_DATE "1.1, 8 May 2013"
+
 #include "slaveCommands.h"
 
 // Various...

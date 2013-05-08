@@ -102,7 +102,9 @@ void setup()
   ledBlinkCount = 0;
   
   DEBUG_IO.begin(DEBUG_BAUD);
-  DEBUG_IO.println("\nRepRapPro slave controller restarted.");
+  DEBUG_IO.print("\nRepRapPro slave controller Version ");
+  DEBUG_IO.print(VERSION_DATE);
+  DEBUG_IO.print(" restarted.\n Temps:");
   debug = false;
   MASTER.begin(BAUD); 
   bp = 0;
@@ -131,7 +133,10 @@ void setup()
     eRs[i] = TH_RS;
     eRInf[i] = TH_R_INF;
     dudTempCount[i] = 0;
+    DEBUG_IO.print(getTemperature(i));
+    DEBUG_IO.print(' ');
   }
+  DEBUG_IO.println();
   
   if(LED_PIN >= 0)
     pinMode(LED_PIN, OUTPUT);
