@@ -22,6 +22,7 @@ extern boolean firstTalk;
 extern boolean inSlaveMessage;
 extern unsigned long timeout;
 extern long precision[];
+extern boolean slaveCommsOK;
 
 
 float slaveDegHotend(uint8_t heater);

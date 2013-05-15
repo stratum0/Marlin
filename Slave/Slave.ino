@@ -589,29 +589,14 @@ void command()
       debugMessage("Drive turned off: ", dh);
       break;
       
-    case GET_KP:
-      talkToMaster(Kp[dh]);
-      debugMessage("Sent Kp: ", Kp[dh]);
-      break;
-      
-    case GET_KI:
-      talkToMaster((float)(Ki[dh]/(0.001*(float)TEMP_INTERVAL)));
-      debugMessage("Sent Ki: ", Ki[dh]);
-      break;
-      
-    case GET_KD:
-      talkToMaster((float)(Kd[dh]*0.001*(float)TEMP_INTERVAL));
-      debugMessage("Sent Kd: ", Kd[dh]);
-      break;
-      
-    case GET_KW:
-      talkToMaster(PidMax[dh]*Ki[dh]);
-      debugMessage("Sent W: ", PidMax[dh]*Ki[dh]);
-      break;
-      
     case SET_KP:
       Kp[dh] = atof(&buf[2]);
       debugMessage("Set Kp to: ", Kp[dh]);
+      break;
+      
+    case GET_KP:
+      talkToMaster(Kp[dh]);
+      debugMessage("Sent Kp: ", Kp[dh]);
       break;
       
     case SET_KI:
@@ -622,17 +607,32 @@ void command()
       PidMax[dh] = constrain(PidMax[dh]/Ki[dh], 0.0, 255.0);
       break;
       
+    case GET_KI:
+      talkToMaster((float)(Ki[dh]/(0.001*(float)TEMP_INTERVAL)));
+      debugMessage("Sent Ki: ", Ki[dh]);
+      break;
+      
     case SET_KD:
       Kd[dh] = atof(&buf[2]);
       debugMessage("Set Kd to: ", Kd[dh]);
       Kd[dh] = Kd[dh]/(0.001*(float)TEMP_INTERVAL);
       break;
       
+    case GET_KD:
+      talkToMaster((float)(Kd[dh]*0.001*(float)TEMP_INTERVAL));
+      debugMessage("Sent Kd: ", Kd[dh]);
+      break;  
+      
     case SET_KW:
       PidMax[dh] = atof(&buf[2]);
       debugMessage("Set w to: ", PidMax[dh]);
       PidMax[dh] = constrain(PidMax[dh], 0.0, 255.0)/Ki[dh];
-      break;    
+      break;   
+      
+    case GET_KW:
+      talkToMaster(PidMax[dh]*Ki[dh]);
+      debugMessage("Sent W: ", PidMax[dh]*Ki[dh]);
+      break;
       
     case H_TEST:
       heaterTest(dh);

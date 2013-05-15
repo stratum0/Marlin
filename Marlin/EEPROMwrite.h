@@ -70,6 +70,14 @@ inline void EEPROM_StoreSettings()
   {
    #ifdef PIDTEMP
     getPIDValues(e, Kpi, Kii, Kdi, Kmi);
+    if(e > 1 && !slaveCommsOK) // If the slave is not online, store default values for that.
+    {
+       SERIAL_PROTOCOLLN("Slave not online! Storing default values.");
+       Kpi = DEFAULT_Kp;   
+       Kii = DEFAULT_Ki;
+       Kdi = DEFAULT_Kd;
+       Kmi = PID_INTEGRAL_DRIVE_MAX;
+    }
     EEPROM_writeAnything(i,Kpi);
     EEPROM_writeAnything(i,Kii);
     EEPROM_writeAnything(i,Kdi);
@@ -182,6 +190,14 @@ inline void EEPROM_printSettings()
       for(int e=1; e <= EXTRUDERS; e++) // 0 is the Bed, currently not implemented
       {
        getPIDValues(e, Kpi, Kii, Kdi, Kmi);
+       if(e > 1 && !slaveCommsOK) // If the slave is not online, show default values for that.
+       {
+         SERIAL_PROTOCOLLN("Slave not online! Default values are:");
+         Kpi = DEFAULT_Kp;   
+         Kii = DEFAULT_Ki;
+         Kdi = DEFAULT_Kd;
+         Kmi = PID_INTEGRAL_DRIVE_MAX;
+       }
        SERIAL_ECHOPAIR("   M301 H", e);
        SERIAL_ECHOPAIR(" P", Kpi); 
        SERIAL_ECHOPAIR(" I", Kii); 
@@ -241,7 +257,10 @@ inline void EEPROM_RetrieveSettings(bool def=false)
     char stored_ver[4];
     char ver[4]=EEPROM_VERSION;
     EEPROM_readAnything(i,stored_ver); //read stored version
-    //  SERIAL_ECHOLN("Version: [" << ver << "] Stored version: [" << stored_ver << "]");
+    SERIAL_PROTOCOL(" Firmware version: ");
+    SERIAL_PROTOCOL(ver);
+    SERIAL_PROTOCOL(", EEPROM version: ");
+    SERIAL_PROTOCOLLN(stored_ver);
     if ((!def)&&(strncmp(ver,stored_ver,3)==0)) 
     {   // version number match
       EEPROM_readAnything(i,axis_steps_per_unit);  

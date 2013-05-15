@@ -9,6 +9,7 @@ char slaveRcvBuffer[SLAVE_BUF];
 boolean setDir[EXTRUDERS];
 boolean firstTalk;
 boolean inSlaveMessage;
+boolean slaveCommsOK;
 boolean driveOn[EXTRUDERS];
 unsigned long timeout;
 long precision[] = {0,10,100,1000,10000,100000,1000000,10000000,100000000};
@@ -17,6 +18,7 @@ void setup_slave()
 {
 	MYSERIAL1.begin(SLAVE_BAUD);
 	SET_OUTPUT(SLAVE_CLOCK);
+        slaveCommsOK = false;
         firstTalk = true;
         inSlaveMessage = false;
         for(int i = 0; i < EXTRUDERS; i++)
@@ -36,6 +38,7 @@ void setup_slave()
             if(slaveDegHotend(2) > -1)
             {
                 SERIAL_PROTOCOLLNPGM("Slave ready");
+                slaveCommsOK = true;
                 return;
             }
         }
@@ -43,6 +46,7 @@ void setup_slave()
     }
     SERIAL_PROTOCOLPGM("Slave init FAIL head ");
     SERIAL_PROTOCOLLN(head);
+    slaveCommsOK = false;
     return;
 }
 

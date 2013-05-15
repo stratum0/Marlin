@@ -1420,23 +1420,9 @@ void process_commands()
       }
     }
     break;
-
-    #ifdef PIDTEMP
-    case 301: // M301
-      if(code_seen('H'))
-      {
-        float Kpi, Kii, Kdi, Kmi;
-        int hval = code_value(); // Extruder number (0 = bed, 1 = master, 2... = slave's) 
-        getPIDValues(hval, Kpi, Kii, Kdi, Kmi);
-        if(code_seen('P')) Kpi = code_value();
-        if(code_seen('I')) Kii = code_value();
-        if(code_seen('D')) Kdi = code_value();
-        if(code_seen('W')) Kmi = code_value();
-        setPIDValues(hval, Kpi, Kii, Kdi, Kmi);
-      }
-      break;
-    #endif //PIDTEMP
-    case 240: // M240  Triggers a camera by emulating a Canon RC-1 : http://www.doc-diy.net/photo/rc-1_hacked/
+    
+    
+     case 240: // M240  Triggers a camera by emulating a Canon RC-1 : http://www.doc-diy.net/photo/rc-1_hacked/
      {
       #ifdef PHOTOGRAPH_PIN
         #if (PHOTOGRAPH_PIN > -1)
@@ -1459,7 +1445,23 @@ void process_commands()
       #endif
      }
     break;
-      
+
+    #ifdef PIDTEMP
+    case 301: // M301
+      if(code_seen('H'))
+      {
+        float Kpi, Kii, Kdi, Kmi;
+        int hval = code_value(); // Extruder number (0 = bed, 1 = master, 2... = slave's) 
+        getPIDValues(hval, Kpi, Kii, Kdi, Kmi);
+        if(code_seen('P')) Kpi = code_value();
+        if(code_seen('I')) Kii = code_value();
+        if(code_seen('D')) Kdi = code_value();
+        if(code_seen('W')) Kmi = code_value();
+        setPIDValues(hval, Kpi, Kii, Kdi, Kmi);
+      }
+      break;
+    #endif //PIDTEMP
+
     case 302: // allow cold extrudes
     {
       allow_cold_extrudes(true);

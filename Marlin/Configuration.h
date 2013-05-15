@@ -187,8 +187,10 @@
 
 // RepRapPro Huxley + Mendel
     #define  DEFAULT_Kp 12.0
-    #define  DEFAULT_Ki (2.2*PID_dT)
-    #define  DEFAULT_Kd (80/PID_dT)
+    //#define  DEFAULT_Ki (2.2*PID_dT) // Time scaling now done in setPIDValues() in temperature.cpp - AB
+    //#define  DEFAULT_Kd (80/PID_dT)
+    #define  DEFAULT_Ki 2.2
+    #define  DEFAULT_Kd 80
 
 #endif // PIDTEMP
 
