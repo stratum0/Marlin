@@ -44,7 +44,7 @@ template <class T> int EEPROM_readAnything(int &ee, T& value)
 // the default values are used whenever there is a change to the data, to prevent
 // wrong data being written to the variables.
 // ALSO:  always make sure the variables in the Store and retrieve sections are in the same order.
-#define EEPROM_VERSION "V06"  
+#define EEPROM_VERSION "V07"  
 
 inline void EEPROM_StoreSettings() 
 {
@@ -70,9 +70,9 @@ inline void EEPROM_StoreSettings()
   {
    #ifdef PIDTEMP
     getPIDValues(e, Kpi, Kii, Kdi, Kmi);
-    if(e > 1 && !slaveCommsOK) // If the slave is not online, store default values for that.
+    if(e > 1 && slaveError) // If the slave is not online, store default values for that.
     {
-       SERIAL_PROTOCOLLN("Slave not online! Storing default values.");
+       SERIAL_PROTOCOLLN("Slave not working! Storing default values.");
        Kpi = DEFAULT_Kp;   
        Kii = DEFAULT_Ki;
        Kdi = DEFAULT_Kd;
@@ -190,9 +190,9 @@ inline void EEPROM_printSettings()
       for(int e=1; e <= EXTRUDERS; e++) // 0 is the Bed, currently not implemented
       {
        getPIDValues(e, Kpi, Kii, Kdi, Kmi);
-       if(e > 1 && !slaveCommsOK) // If the slave is not online, show default values for that.
+       if(e > 1 && slaveError) // If the slave is not online, show default values for that.
        {
-         SERIAL_PROTOCOLLN("Slave not online! Default values are:");
+         SERIAL_PROTOCOLLN("Slave not working! Default values are:");
          Kpi = DEFAULT_Kp;   
          Kii = DEFAULT_Ki;
          Kdi = DEFAULT_Kd;

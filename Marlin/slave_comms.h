@@ -14,6 +14,14 @@
 #define SLAVE_BUF 64
 #define SLAVE_BAUD 250000
 
+// Slave error codes.  ORed together.
+
+#define SLAVE_HEAT1 1
+#define SLAVE_HEAT2 2
+#define SLAVE_TIMEOUT 4
+#define SLAVE_OVERFLOW 8
+
+        
 extern char slaveXmitBuffer[];
 extern char slaveRcvBuffer[];
 extern boolean setDir[];
@@ -21,8 +29,9 @@ extern boolean driveOn[];
 extern boolean firstTalk;
 extern boolean inSlaveMessage;
 extern unsigned long timeout;
+extern unsigned long slaveDelay;
 extern long precision[];
-extern boolean slaveCommsOK;
+extern char slaveError;
 
 
 float slaveDegHotend(uint8_t heater);
@@ -259,9 +268,12 @@ FORCE_INLINE char* listenToSlave()
 {
 	char c = 0;
 	int8_t bp = 0;
-        timeout = millis();
+        slaveDelay = 0;
         inSlaveMessage = false;
-	while(c != END_C && (millis() - timeout < TIMEOUT))
+        slaveError &= ~SLAVE_TIMEOUT;
+        slaveError &= ~SLAVE_OVERFLOW;
+        timeout = millis();
+	while(c != END_C && (slaveDelay < TIMEOUT))
 	{
           if(MYSERIAL1.available())
           {
@@ -297,12 +309,16 @@ FORCE_INLINE char* listenToSlave()
               bp = SLAVE_BUF-1;
               slaveRcvBuffer[bp] = 0;
               SERIAL_PROTOCOLPGM("slave receive buffer overflow: ");
+              slaveError |= SLAVE_OVERFLOW;
               SERIAL_PROTOCOLLN(slaveRcvBuffer);
               slaveRcvBuffer[0] = 0;
               bp = 0;
             }
           }
+          slaveDelay = millis() - timeout;
 	}
+        if(slaveDelay >= TIMEOUT)
+          slaveError |= SLAVE_TIMEOUT;
 	slaveRcvBuffer[bp] = 0;
 	return slaveRcvBuffer;
 }
