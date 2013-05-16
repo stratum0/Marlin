@@ -8,9 +8,9 @@
 // Huxley: http://reprap.org/wiki/RepRapPro_Huxley_maintenance
 
 // Uncomment ONE of the next three lines - the one for your RepRap machine
-//#define REPRAPPRO_HUXLEY
+#define REPRAPPRO_HUXLEY
 //#define REPRAPPRO_MENDEL //Legacy Mendel
-#define REPRAPPRO_MENDEL2 //Tricolour and Mono
+//#define REPRAPPRO_MENDEL2 //Tricolour and Mono
 
 // Uncomment ONE of the next two lines - the one for your master controller electronics
 #define REPRAPPRO_MELZI
@@ -56,8 +56,8 @@
 //User specified version info of THIS file to display in [Pronterface, etc] terminal window during startup.
 //Implementation of an idea by Prof Braino to inform user that any changes made
 //to THIS file by the user have been successfully uploaded into firmware.
-#define STRING_VERSION_CONFIG_H "2013-05-08-RJ" //Personal revision number for changes to THIS file.
-#define STRING_CONFIG_H_AUTHOR "RepRapPro" //Who made the changes.
+#define STRING_VERSION_CONFIG_H "2013-05-16-JMG" //Personal revision number for changes to THIS file.
+#define STRING_CONFIG_H_AUTHOR "eMAKER" //Who made the changes.
 
 // This determines the communication speed of the printer
 //#define BAUDRATE 250000
@@ -244,7 +244,7 @@ const bool Z_ENDSTOPS_INVERTING = false; // set to true to invert the logic of t
 
 #ifdef REPRAPPRO_HUXLEY
 #define AXES_MAX_LENGTHS {155, 150, 90}
-#define INVERT_X_DIR true    // for Mendel set to false, for Orca set to true
+#define INVERT_X_DIR false    // for Mendel set to false, for Orca set to true
 #define INVERT_Y_DIR false    // for Mendel set to true, for Orca set to false
 #define INVERT_Z_DIR false     // for Mendel set to false, for Orca set to true
 #define INVERT_E0_DIR true   // for direct drive extruder v9 set to true, for geared extruder set to false
