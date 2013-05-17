@@ -12,7 +12,7 @@
 
 #define REPRAPPRO_MULTIMATERIALS
 
-#define VERSION_DATE "1.1, 8 May 2013"
+#define VERSION_DATE "1.1, 2013-05-15"
 
 #include "slaveCommands.h"
 
