@@ -170,9 +170,9 @@ float extruder_y_off[EXTRUDERS];
 float extruder_z_off[EXTRUDERS];
 float extruder_standby[EXTRUDERS];
 float extruder_temperature[EXTRUDERS];
-float x_off_d;
-float y_off_d;
-float z_off_d;
+//float x_off_d;
+//float y_off_d;
+//float z_off_d;
 float temp_position[NUM_AXIS] = { 0.0, 0.0, 0.0, 0.0 };
 bool extruder_selected=false;
 
@@ -1607,12 +1607,39 @@ void process_commands()
          // move to temp_position + tmp_extruder - active_extruder; 
          // Set current pos to be temp_position
          // TOTHINKABOUT: What about cumulative errors with a LOT of extruder changes?
+         
+         for(int8_t i=0; i < NUM_AXIS; i++)
+           destination[i] = current_position[i];
+           
+         destination[X_AXIS] -= extruder_x_off[active_extruder];
+         destination[Y_AXIS] -= extruder_y_off[active_extruder];
+         destination[Z_AXIS] -= extruder_z_off[active_extruder];
+
+         next_feedrate = feedrate;    
       
-         for(int8_t i=0; i < NUM_AXIS; i++) 
+         if(extruder_z_off[tmp_extruder] - extruder_z_off[active_extruder] > 0)
          {
-           temp_position[i] = current_position[i];
-           destination[i] = temp_position[i];
+           destination[Z_AXIS] += extruder_z_off[tmp_extruder];
+           feedrate = fast_home_feedrate[Z_AXIS];
+           prepare_move();
+           destination[X_AXIS] += extruder_x_off[tmp_extruder];
+           destination[Y_AXIS] += extruder_y_off[tmp_extruder];            
+           feedrate = fast_home_feedrate[X_AXIS];        
+           prepare_move();
+         } else
+         {
+           destination[X_AXIS] += extruder_x_off[tmp_extruder];
+           destination[Y_AXIS] += extruder_y_off[tmp_extruder];  
+           feedrate = fast_home_feedrate[X_AXIS];
+           prepare_move();
+           destination[Z_AXIS] += extruder_z_off[tmp_extruder];
+           feedrate = fast_home_feedrate[Z_AXIS];
+           prepare_move();      
          }
+         st_synchronize();  // Wait for the moves to finish
+         active_extruder = tmp_extruder;
+         feedrate = next_feedrate;
+/*
          next_feedrate = feedrate;
          x_off_d = extruder_x_off[tmp_extruder] - extruder_x_off[active_extruder];
          y_off_d = extruder_y_off[tmp_extruder] - extruder_y_off[active_extruder];
@@ -1645,7 +1672,7 @@ void process_commands()
            current_position[i] = temp_position[i];
          plan_set_position(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);  
          feedrate = next_feedrate;
-
+*/
          active_extruder = tmp_extruder;
 #ifdef REPRAPPRO_MULTIMATERIALS
          if(active_extruder > 0)
@@ -1693,9 +1720,22 @@ void ClearToSend()
 
 void get_coordinates()
 {
-  for(int8_t i=0; i < NUM_AXIS; i++) {
-    if(code_seen(axis_codes[i])) destination[i] = (float)code_value() + (axis_relative_modes[i] || relative_mode)*current_position[i];
-    else destination[i] = current_position[i]; //Are these else lines really needed?
+  for(int8_t i=0; i < NUM_AXIS; i++) 
+  {
+    if(code_seen(axis_codes[i]))
+    {
+      destination[i] = (float)code_value() + (axis_relative_modes[i] || relative_mode)*current_position[i];
+      if(!(axis_relative_modes[i] || relative_mode))
+      {
+        if(i == X_AXIS)
+          destination[X_AXIS] += extruder_x_off[active_extruder];
+        if(i == Y_AXIS)
+          destination[Y_AXIS] += extruder_y_off[active_extruder];
+        if(i == Z_AXIS)
+          destination[Z_AXIS] += extruder_z_off[active_extruder];
+      }
+    } else 
+      destination[i] = current_position[i]; //Are these else lines really needed?
   }
   if(code_seen('F')) {
     next_feedrate = code_value();
