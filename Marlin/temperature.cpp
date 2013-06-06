@@ -60,6 +60,11 @@ float bBeta, bRs, bRInf;
   float Kd=DEFAULT_Kd;
   
 #endif //PIDTEMP
+
+void bed_temp_error();
+
+char dudMaxCount, dudMinCount, dudBedCount;
+#define DUD_TEMP_COUNT 3
   
   
 //===========================================================================
@@ -421,43 +426,76 @@ void manage_heater()
   // Slave does its own checking
 #ifdef REPRAPPRO_MULTIMATERIALS
 
+    if(dudMaxCount >= 0)
+    {
       if(degHotend(0) >= HEATER_MAXTEMP)
       {
+        dudMaxCount++;
+        if(dudMaxCount >= DUD_TEMP_COUNT)
+        {
+          dudMaxCount = -1;
           setTargetHotend(0,0);
           max_temp_error(0);
-          #ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
-          {
-            Stop();
-          }
-          #endif
-      }
+          //#ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
+          //Stop();
+          //#endif
+        }
+      } else
+        dudMaxCount = 0;
+    } else
+      setTargetHotend(0,0);
+
+    if(dudMinCount >= 0)
+    {  
       if(degHotend(0) <= HEATER_MINTEMP)
       {
+        dudMinCount++;
+        if(dudMinCount >= DUD_TEMP_COUNT)
+        {
+          dudMinCount = -1;
           setTargetHotend(0,0);
           min_temp_error(0);
-          #ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
-          {
-            Stop();
-          }
-          #endif
-      }
+          //#ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
+          //{
+          //  Stop();
+          //}
+          //#endif
+        }
+      } else
+        dudMinCount = 0;
+    } else
+      setTargetHotend(0,0);
 
 #endif
   
   #if TEMP_BED_PIN > -1
 
       // Check if temperature is within the correct range
-      if((current_raw_bed > bed_minttemp) && (current_raw_bed < bed_maxttemp)) {
-        if(current_raw_bed >= target_raw_bed)
+      if(dudBedCount >= 0)
+      {
+        if((current_raw_bed > bed_minttemp) && (current_raw_bed < bed_maxttemp)) 
         {
-          WRITE(HEATER_BED_PIN,LOW);
-        }
-        else 
+          dudBedCount = 0;
+          if(current_raw_bed >= target_raw_bed)
+          {
+            WRITE(HEATER_BED_PIN,LOW);
+          }
+          else 
+          {
+            WRITE(HEATER_BED_PIN,HIGH);
+          }
+        } else
         {
-          WRITE(HEATER_BED_PIN,HIGH);
+          dudBedCount++;
+          if(dudBedCount >= DUD_TEMP_COUNT)
+          {
+            dudBedCount = -1;
+            bed_temp_error();
+            WRITE(HEATER_BED_PIN,LOW);
+          }
         }
-      }
-      else {
+      } else 
+      {
         WRITE(HEATER_BED_PIN,LOW);
       }
   #endif
@@ -522,6 +560,10 @@ float analog2tempBed(int raw)
 
 void tp_init()
 {
+  dudMaxCount = 0;
+  dudMinCount = 0;
+  dudBedCount = 0;
+  
   // Finish init of mult extruder arrays 
   for(int e = 0; e < EXTRUDERS_T; e++) {
     // populate with the first value 
@@ -665,7 +707,7 @@ void disable_heater()
 }
 
 void max_temp_error(uint8_t e) {
-  disable_heater();
+  //disable_heater();
   if(IsStopped() == false) {
     SERIAL_ERROR_START;
     SERIAL_ERRORLN((int)e);
@@ -673,8 +715,17 @@ void max_temp_error(uint8_t e) {
   }
 }
 
+void bed_temp_error() {
+  //disable_heater();
+  if(IsStopped() == false) {
+    SERIAL_ERROR_START;
+    //SERIAL_ERRORLN((int)e);
+    SERIAL_ERRORLNPGM(": Bed switched off. Temp error triggered !");
+  }
+}
+
 void min_temp_error(uint8_t e) {
-  disable_heater();
+  //disable_heater();
   if(IsStopped() == false) {
     SERIAL_ERROR_START;
     SERIAL_ERRORLN((int)e);
@@ -876,24 +927,48 @@ ISR(TIMER0_COMPB_vect)
             //Do nothing
         }else{
 #endif
-       if(current_raw[e] >= maxttemp[e]) {
+  if(dudMaxCount >= 0)
+  {
+       if(current_raw[e] >= maxttemp[e]) 
+       {
+         dudMaxCount++;
+         if(dudMaxCount > DUD_TEMP_COUNT)
+         {
+          dudMaxCount = -1;
           target_raw[e] = 0;
           max_temp_error(e);
-          #ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
-          {
-            Stop();
-          }
-          #endif
-       }
-       if(current_raw[e] <= minttemp[e]) {
+          //#ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
+          //{
+          //  Stop();
+          //}
+          //#endif
+         }
+       } else
+         dudMaxCount = 0;
+  } else
+    target_raw[e] = 0;
+       
+  if(dudMinCount >= 0)
+  {
+       if(current_raw[e] <= minttemp[e]) 
+       {
+         dudMinCount++;
+         if(dudMinCount > DUD_TEMP_COUNT)
+         {
           target_raw[e] = 0;
           min_temp_error(e);
-          #ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
-          {
-            Stop();
-          }
-          #endif
-       }
+          dudMinCount = -1;
+         // #ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
+         // {
+         //  Stop();
+         //}
+         //#endif
+         }
+       } else
+         dudMinCount = 0;
+  } else
+    target_raw[e] = 0;
+    
 #ifdef REPRAPPRO_MULTIMATERIALS
     }
 #endif
@@ -901,11 +976,22 @@ ISR(TIMER0_COMPB_vect)
 
 
 #if defined(BED_MAXTEMP) && (HEATER_BED_PIN > -1)
-    if(current_raw_bed >= bed_maxttemp) {
+  if(dudBedCount >= 0)
+  {
+    if(current_raw_bed >= bed_maxttemp) 
+    {
+      dudBedCount++;
+      if(dudBedCount >= DUD_TEMP_COUNT)
+      {
+       dudBedCount = -1;
        target_raw_bed = 0;
-       bed_max_temp_error();
-       Stop();
-    }
+       bed_temp_error();
+       //Stop();
+      }
+    } else
+      dudBedCount = 0;
+  } else
+    target_raw_bed = 0;
 #endif
   }
 }

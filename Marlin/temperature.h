@@ -38,6 +38,10 @@
 void tp_init();  //initialise the heating
 void manage_heater(); //it is critical that this is called periodically.
 
+void max_temp_error(uint8_t extruder);
+void min_temp_error(uint8_t extruder);
+void bed_temp_error();
+
 void setExtruderThermistor(int8_t e, const float& b, const float& r, const float& i);
 void setBedThermistor(const float& b, const float& r, const float& i);
 float getExtruderBeta(int8_t e);
@@ -68,6 +72,10 @@ extern int current_raw[EXTRUDERS_T];
 extern int target_raw_bed;
 extern int current_raw_bed;
 
+extern char dudMinCount;
+extern char dudMaxCount;
+extern char dudBedCount;
+
 extern float Kp,Ki,Kd,Kc;
 extern int Ki_Max;
 
@@ -92,10 +100,23 @@ FORCE_INLINE void setTargetHotend(const float &celsius, uint8_t extruder)
 {
   if(extruder == 0)
   {  
+    if(dudMinCount < 0 || dudMaxCount < 0)
+    {
+        if(dudMaxCount < 0)
+           max_temp_error(extruder);
+        else
+          min_temp_error(extruder);
+  	target_raw[extruder] = temp2analog(0.0, extruder);
+	#ifdef PIDTEMP
+  		pid_setpoint[extruder] = 0.0;
+	#endif //PIDTEMP
+    } else
+    {
   	target_raw[extruder] = temp2analog(celsius, extruder);
 	#ifdef PIDTEMP
   		pid_setpoint[extruder] = celsius;
-	#endif //PIDTEMP
+	#endif //PIDTEMP      
+    }
   } else
 	slaveSetTargetHotend(celsius, extruder);
 };
@@ -161,8 +182,12 @@ FORCE_INLINE float degTargetBed() {
 };
 
 FORCE_INLINE void setTargetBed(const float &celsius) {  
-  
-  target_raw_bed = temp2analogBed(celsius);
+  if(dudBedCount < 0)
+  {
+    bed_temp_error();
+    target_raw_bed = temp2analogBed(0.0);
+  } else
+    target_raw_bed = temp2analogBed(celsius);
 };
 
 FORCE_INLINE bool isHeatingBed() {
