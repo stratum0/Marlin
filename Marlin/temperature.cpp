@@ -767,19 +767,21 @@ ISR(TIMER0_COMPB_vect)
   static unsigned char soft_pwm_1;
   static unsigned char soft_pwm_2;
   
+  boolean heatOn = ( (dudMinCount >= 0) && (dudMaxCount >= 0) );
+  
   if(pwm_count == 0){
     soft_pwm_0 = soft_pwm[0];
-    if(soft_pwm_0 > 0) WRITE(HEATER_0_PIN,1);
+    if(soft_pwm_0 > 0) WRITE(HEATER_0_PIN,heatOn);
     #ifdef REPRAPPRO_MULTIMATERIALS
         // Nothing to do here - remote handles it
     #else
     #if EXTRUDERS_T > 1
     soft_pwm_1 = soft_pwm[1];
-    if(soft_pwm_1 > 0) WRITE(HEATER_1_PIN,1);
+    if(soft_pwm_1 > 0) WRITE(HEATER_1_PIN,heatOn);
     #endif
     #if EXTRUDERS_T > 2
     soft_pwm_2 = soft_pwm[2];
-    if(soft_pwm_2 > 0) WRITE(HEATER_2_PIN,1);
+    if(soft_pwm_2 > 0) WRITE(HEATER_2_PIN,heatOn);
     #endif
     #endif
   }

@@ -151,8 +151,27 @@ FORCE_INLINE float degHotend(uint8_t extruder) {
   return analog2temp(current_raw[extruder], extruder);
 };
 
-FORCE_INLINE void setTargetHotend(const float &celsius, uint8_t extruder) {  
-  target_raw[extruder] = temp2analog(celsius, extruder);
+FORCE_INLINE void setTargetHotend(const float &celsius, uint8_t extruder) 
+{  
+      if(dudMinCount < 0 || dudMaxCount < 0)
+    {
+        if(dudMaxCount < 0)
+           max_temp_error(extruder);
+        else
+          min_temp_error(extruder);
+  	target_raw[extruder] = temp2analog(0.0, extruder);
+	#ifdef PIDTEMP
+  		pid_setpoint[extruder] = 0.0;
+	#endif //PIDTEMP
+    } else
+    {
+  	target_raw[extruder] = temp2analog(celsius, extruder);
+	#ifdef PIDTEMP
+  		pid_setpoint[extruder] = celsius;
+	#endif //PIDTEMP      
+    }
+  
+  //target_raw[extruder] = temp2analog(celsius, extruder);
 #ifdef PIDTEMP
   pid_setpoint[extruder] = celsius;
 #endif //PIDTEMP
