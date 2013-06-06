@@ -324,7 +324,10 @@ inline void setTemperature(int8_t heater, const float& t)
 {
   if(heater < 0 || heater >= HOT_ENDS)
     return;
-  setTemps[heater]=t;
+  if(dudTempCount[heater] >= 0)
+    setTemps[heater]=t;
+  else
+    setTemps[heater]=0.0;
 }
 
 
@@ -344,13 +347,19 @@ inline float getTemperature(int8_t heater)
   r = ABS_ZERO + eBeta[heater]/log( (r*eRs[heater]/(AD_RANGE - r)) /eRInf[heater] );
   currentTemps[heater] = r;
   
-  if(r > HEATER_MAXTEMP || r < HEATER_MINTEMP)
-    dudTempCount[heater]++;
-  else
-    dudTempCount[heater] = 0;
- 
-  if(dudTempCount[heater] > 3 && !errorStopped)
-    error(true, "temp bounds exceeded");
+  if(dudTempCount[heater] >= 0)
+  {
+    if(r > HEATER_MAXTEMP || r < HEATER_MINTEMP)
+      dudTempCount[heater]++;
+    else
+      dudTempCount[heater] = 0;
+   
+    if(dudTempCount[heater] > 3 && !errorStopped)
+    {
+      dudTempCount[heater] = -1;
+      error(false, "temp bounds exceeded"); 
+    }
+  }
   
   return r;
 }
@@ -407,7 +416,7 @@ void heatControl()
   for(int8_t heater = 0; heater < HOT_ENDS; heater++)
   {
      power = (unsigned int)(pid(heater)*PID_MAX);
-     if(!errorStopped)
+     if(dudTempCount[heater] >= 0)
        analogWrite(heaters[heater], power);
      else
        analogWrite(heaters[heater], 0);
