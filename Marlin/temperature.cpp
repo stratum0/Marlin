@@ -107,11 +107,13 @@ static unsigned long  previous_millis_bed_heater;
 
 void setExtruderThermistor(int8_t e, const float& b, const float& r, const float& i)
 {
+  #ifdef REPRAPPRO_MULTIMATERIALS
   if(e > 0)
   {
      setSlaveExtruderThermistor(e, b, r, i);
      return;
   }
+  #endif
   eBeta = b;
   eRs = r;
   eRInf = i;
@@ -128,21 +130,27 @@ float getExtruderBeta(int8_t e)
 {
   if(e == 0)
     return eBeta;
+  #ifdef REPRAPPRO_MULTIMATERIALS
   return getSlaveExtruderBeta(e);
+  #endif
 }
 
 float getExtruderRs(int8_t e)
 {
   if(e == 0)
     return eRs;
+  #ifdef REPRAPPRO_MULTIMATERIALS
   return getSlaveExtruderRs(e);
+  #endif
 }
 
 float getExtruderRInf(int8_t e)
 {
   if(e == 0)
     return eRInf;
+  #ifdef REPRAPPRO_MULTIMATERIALS
   return getSlaveExtruderRInf(e);
+  #endif
 }
 
 float getBedBeta() { return bBeta; }

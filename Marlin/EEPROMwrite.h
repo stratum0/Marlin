@@ -44,7 +44,7 @@ template <class T> int EEPROM_readAnything(int &ee, T& value)
 // the default values are used whenever there is a change to the data, to prevent
 // wrong data being written to the variables.
 // ALSO:  always make sure the variables in the Store and retrieve sections are in the same order.
-#define EEPROM_VERSION "V07"  
+#define EEPROM_VERSION "V08"  
 
 inline void EEPROM_StoreSettings() 
 {
@@ -70,6 +70,7 @@ inline void EEPROM_StoreSettings()
   {
    #ifdef PIDTEMP
     getPIDValues(e, Kpi, Kii, Kdi, Kmi);
+    #ifdef REPRAPPRO_MULTIMATERIALS
     if(e > 1 && slaveError) // If the slave is not online, store default values for that.
     {
        SERIAL_PROTOCOLLN("Slave not working! Storing default values.");
@@ -78,6 +79,7 @@ inline void EEPROM_StoreSettings()
        Kdi = DEFAULT_Kd;
        Kmi = PID_INTEGRAL_DRIVE_MAX;
     }
+    #endif
     EEPROM_writeAnything(i,Kpi);
     EEPROM_writeAnything(i,Kii);
     EEPROM_writeAnything(i,Kdi);
@@ -190,6 +192,7 @@ inline void EEPROM_printSettings()
       for(int e=1; e <= EXTRUDERS; e++) // 0 is the Bed, currently not implemented
       {
        getPIDValues(e, Kpi, Kii, Kdi, Kmi);
+       #ifdef REPRAPPRO_MULTIMATERIALS
        if(e > 1 && slaveError) // If the slave is not online, show default values for that.
        {
          SERIAL_PROTOCOLLN("Slave not working! Default values are:");
@@ -198,6 +201,7 @@ inline void EEPROM_printSettings()
          Kdi = DEFAULT_Kd;
          Kmi = PID_INTEGRAL_DRIVE_MAX;
        }
+       #endif
        SERIAL_ECHOPAIR("   M301 H", e);
        SERIAL_ECHOPAIR(" P", Kpi); 
        SERIAL_ECHOPAIR(" I", Kii); 
