@@ -51,7 +51,7 @@ void setup_slave()
         slaveError &= ~SLAVE_HEAT1;
         slaveError &= ~SLAVE_HEAT2;
         SERIAL_PROTOCOLPGM(".");
-        if(slaveDegHotend(1) > -1)
+/*        if(slaveDegHotend(1) > -1)
         {
             if(slaveDegHotend(2) > -1)
             {
@@ -60,7 +60,20 @@ void setup_slave()
             }
             slaveError |= SLAVE_HEAT2;
         }
-        slaveError |= SLAVE_HEAT1;
+        slaveError |= SLAVE_HEAT1;*/
+        
+
+        if(slaveDegHotend(2) <= -1)
+            slaveError |= SLAVE_HEAT1;
+            
+        if(slaveDegHotend(1) <= -1)
+          slaveError |= SLAVE_HEAT2;
+        
+        if(!((slaveError & SLAVE_HEAT1) || (slaveError & SLAVE_HEAT2)))
+        {
+          SERIAL_PROTOCOLLNPGM("Slave ready");
+          return;
+        }
         delay(1000);
     }
     slaveErrorReport();
