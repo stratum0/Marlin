@@ -8,7 +8,7 @@
 // Huxley: http://reprap.org/wiki/RepRapPro_Huxley_maintenance
 
 // Uncomment ONE of the next three lines - the one for your RepRap machine
-#define REPRAPPRO_HUXLEY
+//#define REPRAPPRO_HUXLEY
 //#define REPRAPPRO_MENDEL //Legacy Mendel
 //#define REPRAPPRO_MENDEL2 //Tricolour and Mono
 
