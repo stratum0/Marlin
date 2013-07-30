@@ -4,6 +4,12 @@
 #ifndef MARLIN_H
 #define MARLIN_H
 
+#include "Configuration.h"
+
+#ifndef REPRAPPRO_MULTIMATERIALS
+#define  HardwareSerial_h // trick to disable the standard HWserial
+#endif
+
 #define  FORCE_INLINE __attribute__((always_inline)) inline
 
 #include <math.h>
@@ -21,11 +27,6 @@
 
 #include "fastio.h"
 
-#include "Configuration.h"
-
-#ifndef REPRAPPRO_MULTIMATERIALS
-#define  HardwareSerial_h // trick to disable the standard HWserial
-#endif
 #include "pins.h"
 
 #if ARDUINO >= 100 
@@ -119,6 +120,7 @@ void process_commands();
 
 void manage_inactivity(byte debug);
 
+
 #if X_ENABLE_PIN > -1
   #define  enable_x() WRITE(X_ENABLE_PIN, X_ENABLE_ON)
   #define disable_x() WRITE(X_ENABLE_PIN,!X_ENABLE_ON)
@@ -142,6 +144,16 @@ void manage_inactivity(byte debug);
   #define enable_z() ;
   #define disable_z() ;
 #endif
+
+       
+#ifdef REPRAPPRO_MULTIMATERIALS
+ #define enable_e0() WRITE(E0_ENABLE_PIN, E_ENABLE_ON)
+ #define disable_e0() WRITE(E0_ENABLE_PIN,!E_ENABLE_ON)
+ #define disable_e1() slaveDriveOff(1)
+ #define disable_e2() slaveDriveOff(2)
+ #define enable_e1() slaveDriveOn(1)
+ #define enable_e2() slaveDriveOn(2)
+#else
 
 #if defined(E0_ENABLE_PIN) && (E0_ENABLE_PIN > -1)
   #define enable_e0() WRITE(E0_ENABLE_PIN, E_ENABLE_ON)
@@ -167,6 +179,10 @@ void manage_inactivity(byte debug);
   #define disable_e2() /* nothing */
 #endif
 
+#endif
+
+
+
 
 enum AxisEnum {X_AXIS=0, Y_AXIS=1, Z_AXIS=2, E_AXIS=3};
 
@@ -178,6 +194,9 @@ void get_coordinates();
 void prepare_move();
 void kill();
 void Stop();
+void shutDown();
+
+boolean check_all_temps();
 
 bool IsStopped();
 
@@ -196,10 +215,6 @@ extern volatile int feedmultiply;
 extern int saved_feedmultiply;
 extern float current_position[NUM_AXIS] ;
 extern float add_homeing[3];
-extern float max_length[3];
-#ifdef ADVANCE
-extern float advance_k;
-#endif
 extern unsigned char FanSpeed;
 
 extern float destination[NUM_AXIS];

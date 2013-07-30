@@ -20,6 +20,9 @@ void led_status()
    if (degTargetHotend(active_extruder) > HEATER_0_MINTEMP)
    {
      if (((millis() - previous_millis_toggle) < LED_HOTEND_ACTIVE_FLASH))
+        return;
+    previous_millis_toggle=millis();
+    TOGGLE(LED_PIN);
    }
    else
    {

@@ -3,14 +3,14 @@
 
 // ==============================================================================
 
-// For instructions on setting these constants, see:
+// For instructions on setting these #defines, see:
 // Mendel: http://reprap.org/wiki/RepRapPro_Mendel_maintenance
 // Huxley: http://reprap.org/wiki/RepRapPro_Huxley_maintenance
 
 // Uncomment ONE of the next three lines - the one for your RepRap machine
 //#define REPRAPPRO_HUXLEY
 //#define REPRAPPRO_MENDEL //Legacy Mendel
-//#define REPRAPPRO_MENDEL2 //Tricolour and Mono
+//#define REPRAPPRO_MENDEL2 //Tricolour
 
 // Uncomment ONE of the next two lines - the one for your master controller electronics
 #define REPRAPPRO_MELZI
@@ -22,6 +22,8 @@
 
 // Uncomment the next line if your machine has more than one extruder
 //#define REPRAPPRO_MULTIMATERIALS
+
+
 
 // -------------------------------------------------------------------------------
 
@@ -56,13 +58,12 @@
 //User specified version info of THIS file to display in [Pronterface, etc] terminal window during startup.
 //Implementation of an idea by Prof Braino to inform user that any changes made
 //to THIS file by the user have been successfully uploaded into firmware.
-#define STRING_VERSION_CONFIG_H "2013-05-16-JMG" //Personal revision number for changes to THIS file.
-#define STRING_CONFIG_H_AUTHOR "eMAKER" //Who made the changes.
+#define STRING_VERSION_CONFIG_H "2013-07-08" //Personal revision number for changes to THIS file.
+#define STRING_CONFIG_H_AUTHOR "RepRapPro" //Who made the changes.
 
 // This determines the communication speed of the printer
 //#define BAUDRATE 250000
 #define BAUDRATE 115200
-
 //// The following define selects which electronics board you have. Please choose the one that matches your setup
 // Sanguinololu 1.2 and above = 62
 // Melzi 63
@@ -99,11 +100,16 @@
 
 // This DOES assume that all extruders use the same thermistor type.
 
+#define BED_USES_THERMISTOR
+#define HEATER_0_USES_THERMISTOR
+#define HEATER_1_USES_THERMISTOR
+#define HEATER_2_USES_THERMISTOR
 
 #define ABS_ZERO -273.15
 #define AD_RANGE 16383
 
-// RS 198-961
+
+// Extruder thermistor: RS 198-961
 #define E_BETA 3960.0
 #define E_RS SERIAL_R
 #define E_NTC 100000.0
@@ -113,18 +119,7 @@
 #ifdef REPRAPPRO_MENDEL
 // Bed thermistor: RS 484-0149; EPCOS B57550G103J
 #define BED_BETA 3480.0
-#define BED_RS SERIAL_R
 #define BED_NTC 10000.0
-#define BED_R_INF ( BED_NTC*exp(-BED_BETA/298.15) )
-
-#endif
-
-#ifdef REPRAPPRO_HUXLEY
-// VISHAY BC COMPONENTS - NTCS0603E3104FXT
-#define BED_BETA 4100.0
-#define BED_RS SERIAL_R
-#define BED_NTC 100000.0
-#define BED_R_INF ( BED_NTC*exp(-BED_BETA/298.15) )
 #endif
 
 #ifdef REPRAPPRO_MENDEL2
@@ -136,35 +131,41 @@
 #endif
 
 
-#define BED_USES_THERMISTOR
-#define HEATER_0_USES_THERMISTOR
-#define HEATER_1_USES_THERMISTOR
-#define HEATER_2_USES_THERMISTOR
+#ifdef REPRAPPRO_HUXLEY
+// Bed thermistor: VISHAY BC COMPONENTS - NTCS0603E3104FXT
+#define BED_BETA 4100.0
+#define BED_NTC 100000.0
+#endif
 
+#define BED_RS SERIAL_R
+#define BED_R_INF ( BED_NTC*exp(-BED_BETA/298.15) )
 
 
 // Actual temperature must be close to target for this long before M109 returns success
-#define TEMP_RESIDENCY_TIME 5  // (seconds)
-#define TEMP_HYSTERESIS 5       // (C°) range of +/- temperatures considered "close" to the target one
-#define TEMP_WINDOW     2       // (degC) Window around target to start the recidency timer x degC early.
+#define TEMP_RESIDENCY_TIME 0  // (seconds)
+#define TEMP_HYSTERESIS 10       // (C°) range of +/- temperatures considered "close" to the target one
+#define TEMP_WINDOW     15       // (degC) Window around target to start the recidency timer x degC early.
 
 // The minimal temperature defines the temperature below which the heater will not be enabled It is used
 // to check that the wiring to the thermistor is not broken. 
 // Otherwise this would lead to the heater being powered on all the time.
-#define HEATER_0_MINTEMP 1
+
+#define HEATER_MINTEMP -1
+#define HEATER_0_MINTEMP HEATER_MINTEMP
 #ifdef REPRAPPRO_MULTIMATERIALS
-#define HEATER_1_MINTEMP 1
-#define HEATER_2_MINTEMP 1
+#define HEATER_1_MINTEMP HEATER_MINTEMP
+#define HEATER_2_MINTEMP HEATER_MINTEMP
 #endif
 #define BED_MINTEMP 1
 
 // When temperature exceeds max temp, your heater will be switched off.
 // This feature exists to protect your hotend from overheating accidentally, but *NOT* from thermistor short/failure!
 // You should use MINTEMP for thermistor short/failure protection.
-#define HEATER_0_MAXTEMP 399
+#define HEATER_MAXTEMP 275
+#define HEATER_0_MAXTEMP HEATER_MAXTEMP
 #ifdef REPRAPPRO_MULTIMATERIALS
-#define HEATER_1_MAXTEMP 275
-#define HEATER_2_MAXTEMP 275
+#define HEATER_1_MAXTEMP HEATER_MAXTEMP
+#define HEATER_2_MAXTEMP HEATER_MAXTEMP
 #endif
 #define BED_MAXTEMP 150
 
@@ -183,8 +184,10 @@
 
 // RepRapPro Huxley + Mendel
     #define  DEFAULT_Kp 12.0
-    #define  DEFAULT_Ki (2.2*PID_dT)
-    #define  DEFAULT_Kd (80/PID_dT)
+    //#define  DEFAULT_Ki (2.2*PID_dT) // Time scaling now done in setPIDValues() in temperature.cpp - AB
+    //#define  DEFAULT_Kd (80/PID_dT)
+    #define  DEFAULT_Ki 2.2
+    #define  DEFAULT_Kd 80
 
 #endif // PIDTEMP
 
@@ -193,7 +196,7 @@
 //can be software-disabled for whatever purposes by
 #define PREVENT_DANGEROUS_EXTRUDE
 #define EXTRUDE_MINTEMP 170
-#define EXTRUDE_MAXLENGTH (200) //prevent extrusion of very large distances.
+#define EXTRUDE_MAXLENGTH (X_MAX_LENGTH+Y_MAX_LENGTH) //prevent extrusion of very large distances.
 #else
 #define BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
 #endif
@@ -272,7 +275,7 @@ const bool Z_ENDSTOPS_INVERTING = false; // set to true to invert the logic of t
 
 #ifdef REPRAPPRO_MENDEL
 
-#define X_MAX_LENGTH 210  
+#define X_MAX_LENGTH 210
 #define Y_MAX_LENGTH 210
 #define Z_MAX_LENGTH 110
 #define HOMING_FEEDRATE {10*60, 10*60, 1*60, 0}  // set the homing speeds (mm/min)
@@ -311,17 +314,16 @@ const bool Z_ENDSTOPS_INVERTING = false; // set to true to invert the logic of t
 
 // default settings 
 // X, Y, Z, E steps per mm
-#define DEFAULT_AXIS_STEPS_PER_UNIT   {92.635, 92.635, 4000, 660} 
+#define DEFAULT_AXIS_STEPS_PER_UNIT    {92.635, 92.635, 4000, 660}
+
 
 // Defaults changed by the G10 command
 
 #define X_EXTRUDER_OFFSET 0
 #define Y_EXTRUDER_OFFSET 0
 #define Z_EXTRUDER_OFFSET 0
-#define STANDBY_TEMP 140
-#define PLA_TEMP 205
-#define ABS_TEMP 250
-#define DEFAULT_TEMP PLA_TEMP
+#define STANDBY_TEMP 0
+#define DEFAULT_TEMP 0
 
 
 #define DEFAULT_ACCELERATION          1000    // X, Y, Z and E max acceleration in mm/s^2 for printing moves 

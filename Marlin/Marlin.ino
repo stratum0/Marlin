@@ -18,7 +18,7 @@
 
 /*
  This firmware is a mashup between Sprinter and grbl.
-  (https://github.com/kliment/Sprinter)
+  (https://github.com/kliment/Sprinter)manage
   (https://github.com/simen/grbl/tree)
  
  It has preliminary support for Matthew Roberts advance algorithm 
@@ -45,13 +45,13 @@
 #include "stepper.h"
 #include "temperature.h"
 #include "motion_control.h"
-#include "cardreader.h"
+#include "Sd.h"
 #include "EEPROMwrite.h"
 #include "language.h"
 #include "pins_arduino.h"
 #include "slave_comms.h"
 
-#define VERSION_STRING  "1.0.1 RRP"
+#define VERSION_STRING  "1.0.7 RRP"
 
 // look here for descriptions of gcodes: http://linuxcnc.org/handbook/gcode/g-code.html
 // http://objects.reprap.org/wiki/Mendel_User_Manual:_RepRapGCodes
@@ -74,6 +74,9 @@
 // G92 - Set current position to cordinates given
 
 //RepRap M Codes
+// M0 - Shut down
+// M1 - Shut down but stay listening
+// M112 - emergency stop
 // M104 - Set extruder target temp (deprecated)
 // M105 - Read current temp
 // M106 - Fan on
@@ -161,20 +164,17 @@ int saved_feedmultiply;
 volatile bool feedmultiplychanged=false;
 volatile int extrudemultiply=100; //100->1 200->2
 float current_position[NUM_AXIS] = { 0.0, 0.0, 0.0, 0.0 };
-float add_homeing[3]={0,0,0};
 float max_length[] = AXES_MAX_LENGTHS;
-#ifdef ADVANCE
-float advance_k = EXTRUDER_ADVANCE_K;
-#endif
+float add_homeing[3]={0,0,0};
 uint8_t active_extruder = 0;
 float extruder_x_off[EXTRUDERS];
 float extruder_y_off[EXTRUDERS];
 float extruder_z_off[EXTRUDERS];
 float extruder_standby[EXTRUDERS];
 float extruder_temperature[EXTRUDERS];
-float x_off_d;
-float y_off_d;
-float z_off_d;
+//float x_off_d;
+//float y_off_d;
+//float z_off_d;
 float temp_position[NUM_AXIS] = { 0.0, 0.0, 0.0, 0.0 };
 bool extruder_selected=false;
 
@@ -192,7 +192,7 @@ float modified_destination[NUM_AXIS] = {  0.0, 0.0, 0.0, 0.0};
 //=============================private variables=============================
 //===========================================================================
 const char axis_codes[NUM_AXIS] = {'X', 'Y', 'Z', 'E'};
-static bool home_all_axis = true;
+static bool home_all_axes = true;
 static long gcode_N, gcode_LastN, Stopped_gcode_LastN = 0;
 
 static bool relative_mode = false;  //Determines Absolute or Relative Coordinates
@@ -218,12 +218,14 @@ const int sensitive_pins[] = SENSITIVE_PINS; // Sensitive pin list for M42
 static unsigned long previous_millis_cmd = 0;
 static unsigned long max_inactive_time = 0;
 static unsigned long stepper_inactive_time = DEFAULT_STEPPER_DEACTIVE_TIME*1000l;
+static unsigned long inactivity_time = 0;
 
 static unsigned long starttime=0;
 static unsigned long stoptime=0;
 
 static uint8_t tmp_extruder;
 
+static uint8_t dudTempCount;
 
 bool Stopped=false;
 
@@ -312,8 +314,9 @@ void setup()
     extruder_z_off[i] = Z_EXTRUDER_OFFSET;
     extruder_standby[i] = STANDBY_TEMP;
     extruder_temperature[i] = DEFAULT_TEMP;
+    setExtruderThermistor(i, E_BETA, E_RS, E_R_INF);
   }
-
+  setBedThermistor(BED_BETA, BED_RS, BED_R_INF);
 
   // Check startup - does nothing if bootloader sets MCUSR to 0
   byte mcu = MCUSR;
@@ -345,6 +348,10 @@ void setup()
     fromsd[i] = false;
   }
   
+  #ifdef REPRAPPRO_MULTIMATERIALS
+    setup_slave();
+  #endif
+  
   EEPROM_RetrieveSettings(); // loads data from EEPROM if available
 
   for(int8_t i=0; i < NUM_AXIS; i++)
@@ -362,11 +369,6 @@ void setup()
   probe_init(); //Initializes probe if PROBE_PIN is defined
   FPUTransform_init(); //Initializes FPU when UMFPUSUPPORT defined
   setup_photpin();
-  
-#ifdef REPRAPPRO_MULTIMATERIALS
-  setup_slave();
-#endif
-
 }
 
 
@@ -407,8 +409,8 @@ void loop()
   manage_heater();
   manage_inactivity(1);
   checkHitEndstops();
-  LCD_STATUS;
-  LED_STATUS;
+  lcd_status();
+  led_status();
 }
 
 void get_command() 
@@ -582,6 +584,11 @@ long code_value_long()
   return (strtol(&cmdbuffer[bufindr][strchr_pointer - cmdbuffer[bufindr] + 1], NULL, 10)); 
 }
 
+int code_value_int() 
+{ 
+  return (int)code_value_long(); 
+}
+
 bool code_seen(char code_string[]) //Return True if the string was found
 { 
   return (strstr(cmdbuffer[bufindr], code_string) != NULL); 
@@ -610,7 +617,7 @@ bool code_seen(char code)
     st_synchronize();\
     \
     destination[LETTER##_AXIS] = 2*LETTER##_HOME_RETRACT_MM * LETTER##_HOME_DIR;\
-    feedrate = homing_feedrate[LETTER##_AXIS] ;  \
+    feedrate = homing_feedrate[LETTER##_AXIS] ; \
     plan_buffer_line(destination[X_AXIS], destination[Y_AXIS], destination[Z_AXIS], destination[E_AXIS], feedrate/60, active_extruder); \
     st_synchronize();\
     \
@@ -619,9 +626,116 @@ bool code_seen(char code)
     feedrate = 0.0;\
     endstops_hit_on_purpose();\
   }
+
+/*
+inline uint8_t check_all_temps(uint8_t goodCount)
+{
+  boolean ok = true;
+  float temp;
+  for(uint8_t e = 0; e < EXTRUDERS; e++)
+  {
+    temp = degHotend(e);
+#ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
+    if(temp > HEATER_MAXTEMP || temp < HEATER_MINTEMP)
+    {
+      dudTempCount++;
+      if(dudTempCount > 2) // Don't bother with the odd dud reading, but if we get three in a row kill it
+        Stop();
+    } else
+      dudTempCount = 0;
+#endif
+    if(degTargetHotend(e) > 30 && abs(temp - degTargetHotend(e)) > TEMP_HYSTERESIS)  // 30 is because we don't care about cold temps.
+      ok = false;
+    SERIAL_PROTOCOLPGM("  T");
+    SERIAL_PROTOCOL( (int)e );
+    SERIAL_PROTOCOLPGM(": ");
+    SERIAL_PROTOCOL_F(temp,1);
+  }
+  SERIAL_PROTOCOLLN("");
+  if(ok)
+    goodCount++;
+  else
+    goodCount = 0;
+  return goodCount;  
+}
+*/
+
+inline void wait_for_all_extruder_temps()
+{
+  float targets[EXTRUDERS];
+  boolean ok;
+  float temp;
+  uint8_t e;
+
+  for(e = 0; e < EXTRUDERS; e++)
+  {
+     targets[e] = degTargetHotend(e);
+     delay(10);     // Yuk!
+  }
+    
+  long oldTime = millis();
+  dudTempCount = 0;
+  uint8_t goodCount = 0;
+  uint8_t loopCount = 0;
+    
+  while(goodCount < 3)
+  {
+    if(millis() - oldTime >= 500L)
+    {
+      oldTime = millis();
+      ok = true;
+      if(loopCount > 10)  // Make sure we have the right targets every 5 seconds
+      {
+        for(e = 0; e < EXTRUDERS; e++)
+        {
+         targets[e] = degTargetHotend(e);
+         delay(10);     // Yuk!
+        }
+        loopCount = 0;
+      } else
+        loopCount++;
+        
+      for(e = 0; e < EXTRUDERS; e++)
+      {
+        temp = degHotend(e);
+#ifndef BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE
+        if(temp > HEATER_MAXTEMP || temp < HEATER_MINTEMP)
+        {
+          dudTempCount++;
+          if(dudTempCount > 2) // Don't bother with the odd dud reading, but if we get three in a row kill it
+            Stop();
+        } else
+          dudTempCount = 0;
+#endif
+        if(targets[e] > 30 && abs(temp - targets[e]) > TEMP_HYSTERESIS)  // 30 is because we don't care about cold temps.
+          ok = false;
+        SERIAL_PROTOCOLPGM("  T");
+        SERIAL_PROTOCOL( (int)e );
+        SERIAL_PROTOCOLPGM(": ");
+        SERIAL_PROTOCOL_F(temp,1);
+        SERIAL_PROTOCOLPGM("/");
+        SERIAL_PROTOCOL( (int)targets[e]);
+      }
+      SERIAL_PROTOCOLLN("");
+      if(ok)
+        goodCount++;
+      else
+        goodCount = 0;
+    }
+    manage_heater();
+    manage_inactivity(1);
+    lcd_status();
+    led_status();
+  }
+  starttime=millis();
+  previous_millis_cmd = millis();
+}
   
 void wait_for_temp(uint8_t& t_ext, unsigned long& codenum)
 {
+#ifdef REPRAPPRO_MULTIMATERIALS
+  wait_for_all_extruder_temps();
+#else
         /* See if we are heating up or cooling down */
       bool target_direction = isHeatingHotend(t_ext); // true if heating, false if cooling
 
@@ -676,6 +790,7 @@ void wait_for_temp(uint8_t& t_ext, unsigned long& codenum)
         LCD_MESSAGEPGM(MSG_HEATING_COMPLETE);
         starttime=millis();
         previous_millis_cmd = millis();
+#endif
 }
   
 
@@ -725,21 +840,23 @@ void process_commands()
       break;
       
       case 10: // Set offsets
-      if(code_seen('P'))
-      {
-         tmp_extruder = code_value();
-         get_coordinates();
-         extruder_x_off[tmp_extruder] = destination[0]; // X
-         extruder_y_off[tmp_extruder] = destination[1]; // Y
-         extruder_z_off[tmp_extruder] = destination[2]; // Z
-         if(code_seen('R'))
-             extruder_standby[tmp_extruder] = code_value();
-         if(code_seen('S'))
-             extruder_temperature[tmp_extruder] = code_value();
-      }
+        if(code_seen('P'))
+        {
+           tmp_extruder = code_value();
+           if(code_seen(axis_codes[X_AXIS])) 
+            extruder_x_off[tmp_extruder] = (float)code_value();
+           if(code_seen(axis_codes[Y_AXIS])) 
+            extruder_y_off[tmp_extruder] = (float)code_value();
+           if(code_seen(axis_codes[Z_AXIS])) 
+            extruder_z_off[tmp_extruder] = (float)code_value();
+           if(code_seen('R'))
+               extruder_standby[tmp_extruder] = code_value();
+           if(code_seen('S'))
+               extruder_temperature[tmp_extruder] = code_value();
+        }
       break;
   
-    case 28: //G28 Home all Axis one at a time
+    case 28: //G28 Home all axes one at a time
       saved_feedrate = feedrate;
       saved_feedmultiply = feedmultiply;
       feedmultiply = 100;
@@ -751,41 +868,47 @@ void process_commands()
         destination[i] = current_position[i];
       }
       feedrate = 0.0;
-      home_all_axis = !((code_seen(axis_codes[0])) || (code_seen(axis_codes[1])) || (code_seen(axis_codes[2])));
+      home_all_axes = !((code_seen(axis_codes[X_AXIS])) || (code_seen(axis_codes[Y_AXIS])) || (code_seen(axis_codes[Z_AXIS])));
+
       
-      if((home_all_axis) || (code_seen(axis_codes[X_AXIS]))) 
+      if((home_all_axes) || (code_seen(axis_codes[X_AXIS]))) 
       {
         HOMEAXIS(X);
+        current_position[X_AXIS] = X_HOME_POS + extruder_x_off[0] - extruder_x_off[active_extruder] + add_homeing[0];;
+        destination[X_AXIS] = current_position[X_AXIS];
       }
 
-      if((home_all_axis) || (code_seen(axis_codes[Y_AXIS]))) {
+      if((home_all_axes) || (code_seen(axis_codes[Y_AXIS]))) 
+      {
        HOMEAXIS(Y);
+       current_position[Y_AXIS] = Y_HOME_POS + extruder_y_off[0] - extruder_y_off[active_extruder] + add_homeing[1];;
+       destination[Y_AXIS] = current_position[Y_AXIS];
       }
       
-      if((home_all_axis) || (code_seen(axis_codes[Z_AXIS]))) {
+      if((home_all_axes) || (code_seen(axis_codes[Z_AXIS]))) 
+      {
         HOMEAXIS(Z);
+        current_position[Z_AXIS] = Z_HOME_POS + extruder_z_off[0] - extruder_z_off[active_extruder] + add_homeing[2];;
+        destination[Z_AXIS] = current_position[Z_AXIS];
       }
       
-      if((home_all_axis) || code_seen(axis_codes[X_AXIS])) 
+      if((home_all_axes) || code_seen(axis_codes[X_AXIS])) 
       {
         if(code_value_long() != 0) {
           current_position[X_AXIS]=code_value();
         }
-        current_position[X_AXIS]+=add_homeing[0];
       }
 
-      if((home_all_axis) || code_seen(axis_codes[Y_AXIS])) {
+      if((home_all_axes) || code_seen(axis_codes[Y_AXIS])) {
         if(code_value_long() != 0) {
           current_position[Y_AXIS]=code_value();
         }
-        current_position[Y_AXIS]+=add_homeing[1];
       }
 
-      if((home_all_axis) || code_seen(axis_codes[Z_AXIS])) {
+      if((home_all_axes) || code_seen(axis_codes[Z_AXIS])) {
         if(code_value_long() != 0) {
           current_position[Z_AXIS]=code_value();
         }
-        current_position[Z_AXIS]+=add_homeing[2];
       }
       plan_set_position(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
       
@@ -819,14 +942,16 @@ void process_commands()
     case 92: // G92
       if(!code_seen(axis_codes[E_AXIS]))
         st_synchronize();
-      for(int8_t i=0; i < NUM_AXIS; i++) {
-        if(code_seen(axis_codes[i])) { 
+      for(int8_t i=0; i < NUM_AXIS; i++) 
+      {
+        if(code_seen(axis_codes[i])) 
+        { 
            current_position[i] = code_value()+add_homeing[i];  
            if(i == E_AXIS) {
              current_position[i] = code_value();  
              plan_set_e_position(current_position[E_AXIS]);
-           }
-           else {
+           } else 
+           {
              current_position[i] = code_value()+add_homeing[i];  
              plan_set_position(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
            }
@@ -840,9 +965,12 @@ void process_commands()
   {
     switch( (int)code_value() ) 
     {
-    case 0: // Stops - add me...
+    case 0: // Stops
     case 1:
+            shutDown();
+            break;
     case 112:
+            kill();
       break;
 
     case 17:
@@ -967,9 +1095,11 @@ void process_commands()
      break;
     case 104: // M104
       tmp_extruder = active_extruder;
-      if(code_seen('T')) {                     // Why is this T and not S? - AB
+      if(code_seen('T')) 
+      {                     
         tmp_extruder = code_value();
-        if(tmp_extruder >= EXTRUDERS) {
+        if(tmp_extruder >= EXTRUDERS) 
+        {
           SERIAL_ECHO_START;
           SERIAL_ECHO(MSG_M104_INVALID_EXTRUDER);
           SERIAL_ECHOLN(tmp_extruder);
@@ -979,24 +1109,37 @@ void process_commands()
       if (code_seen('S'))
       {
          extruder_temperature[tmp_extruder] = code_value();
-         setTargetHotend(code_value(), tmp_extruder);
+         setTargetHotend(extruder_temperature[tmp_extruder], tmp_extruder);
       }
       
       break;
     case 140: // M140 set bed temp
       if (code_seen('S')) setTargetBed(code_value());
       break;
-    case 1105:
-      #if (TEMP_0_PIN > -1)
-        SERIAL_PROTOCOLPGM("ok T0 raw:");
-        SERIAL_PROTOCOL(rawHotend(tmp_extruder)); 
-        SERIAL_PROTOCOLPGM(", min:");
-        SERIAL_PROTOCOL(minHotend(tmp_extruder)); 
-        SERIAL_PROTOCOLPGM(", max:");
-        SERIAL_PROTOCOL(maxHotend(tmp_extruder)); 
-      #endif
-      break;
     case 105 : // M105
+#ifdef REPRAPPRO_MULTIMATERIALS
+      SERIAL_PROTOCOLPGM("ok");
+      for(int e = 0; e < EXTRUDERS; e++)
+      {
+        SERIAL_PROTOCOLPGM(" T");
+        SERIAL_PROTOCOL(e);
+        SERIAL_PROTOCOLPGM(": ");
+        SERIAL_PROTOCOL_F(degHotend(e),1);
+        SERIAL_PROTOCOLPGM("/");
+        SERIAL_PROTOCOL_F(degTargetHotend(e),1);
+      }
+      #if TEMP_BED_PIN > -1
+          SERIAL_PROTOCOLPGM(" B:");  
+          SERIAL_PROTOCOL_F(degBed(),1);
+          SERIAL_PROTOCOLPGM(" /");
+          SERIAL_PROTOCOL_F(degTargetBed(),1);
+      #endif //TEMP_BED_PIN  
+      #ifdef PIDTEMP
+        SERIAL_PROTOCOLPGM(" @:");
+        SERIAL_PROTOCOL(getHeaterPower(tmp_extruder));  
+      #endif    
+      SERIAL_PROTOCOLLN(""); 
+#else     
       tmp_extruder = active_extruder;
       if(code_seen('T')) {
         tmp_extruder = code_value();
@@ -1027,12 +1170,13 @@ void process_commands()
         SERIAL_PROTOCOL(getHeaterPower(tmp_extruder));  
       #endif
         SERIAL_PROTOCOLLN("");
+#endif
       return;
       break;
     case 109: 
     // M109 - Wait for extruder heater to reach target.
       tmp_extruder = active_extruder;
-      if(code_seen('T')) {                 // Why is this T and not S? - AB
+      if(code_seen('T')) {                
         tmp_extruder = code_value();
         if(tmp_extruder >= EXTRUDERS) {
           SERIAL_ECHO_START;
@@ -1046,7 +1190,7 @@ void process_commands()
       if (code_seen('S'))
       {
         extruder_temperature[tmp_extruder] = code_value();
-        setTargetHotend(code_value(), tmp_extruder);
+        setTargetHotend(extruder_temperature[tmp_extruder], tmp_extruder);
       }
       
       
@@ -1074,7 +1218,7 @@ void process_commands()
           }
           manage_heater();
           manage_inactivity(1);
-          LCD_STATUS;
+          lcd_status();
         }
         LCD_MESSAGEPGM(MSG_BED_DONE);
         previous_millis_cmd = millis();
@@ -1125,7 +1269,8 @@ void process_commands()
           if(code_seen('Y')) disable_y();
           if(code_seen('Z')) disable_z();
           #if ((E0_ENABLE_PIN != X_ENABLE_PIN) && (E1_ENABLE_PIN != Y_ENABLE_PIN)) // Only enable on boards that have seperate ENABLE_PINS
-            if(code_seen('E')) {
+            if(code_seen('E')) 
+            {
               disable_e0();
               disable_e1();
               disable_e2();
@@ -1240,9 +1385,6 @@ void process_commands()
       if(code_seen('X')) max_xy_jerk = code_value() ;
       if(code_seen('Z')) max_z_jerk = code_value() ;
       if(code_seen('E')) max_e_jerk = code_value() ;
-      #ifdef ADVANCE
-      if(code_seen('K')) advance_k = code_value() ;
-      #endif
     }
     break;
     case 206: // M206 additional homeing offset
@@ -1279,31 +1421,9 @@ void process_commands()
       }
     }
     break;
-
-    #ifdef PIDTEMP
-    case 301: // M301
-      {
-        if(code_seen('P')) Kp = code_value();
-        if(code_seen('I')) Ki = code_value()*PID_dT;
-        if(code_seen('D')) Kd = code_value()/PID_dT;
-        if(code_seen('W')) Ki_Max = constrain(code_value(),0,255);
-
-        updatePID();
-        SERIAL_PROTOCOL(MSG_OK);
-		SERIAL_PROTOCOL(" p:");
-        SERIAL_PROTOCOL(Kp);
-        SERIAL_PROTOCOL(" i:");
-        SERIAL_PROTOCOL(Ki/PID_dT);
-        SERIAL_PROTOCOL(" d:");
-        SERIAL_PROTOCOL(Kd*PID_dT);
-        SERIAL_PROTOCOL(" w:");
-        SERIAL_PROTOCOL(Ki_Max);
-
-        SERIAL_PROTOCOLLN("");
-      }
-      break;
-    #endif //PIDTEMP
-    case 240: // M240  Triggers a camera by emulating a Canon RC-1 : http://www.doc-diy.net/photo/rc-1_hacked/
+    
+    
+     case 240: // M240  Triggers a camera by emulating a Canon RC-1 : http://www.doc-diy.net/photo/rc-1_hacked/
      {
       #ifdef PHOTOGRAPH_PIN
         #if (PHOTOGRAPH_PIN > -1)
@@ -1326,7 +1446,23 @@ void process_commands()
       #endif
      }
     break;
-      
+
+    #ifdef PIDTEMP
+    case 301: // M301
+      if(code_seen('H'))
+      {
+        float Kpi, Kii, Kdi, Kmi;
+        int hval = code_value(); // Extruder number (0 = bed, 1 = master, 2... = slave's) 
+        getPIDValues(hval, Kpi, Kii, Kdi, Kmi);
+        if(code_seen('P')) Kpi = code_value();
+        if(code_seen('I')) Kii = code_value();
+        if(code_seen('D')) Kdi = code_value();
+        if(code_seen('W')) Kmi = code_value();
+        setPIDValues(hval, Kpi, Kii, Kdi, Kmi);
+      }
+      break;
+    #endif //PIDTEMP
+
     case 302: // allow cold extrudes
     {
       if (code_seen('S'))
@@ -1345,43 +1481,33 @@ void process_commands()
     }
     break;
     case 304: // Set thermistor parameters
-    {
       // M304 H0 B3960 R4700
       // M304 H1 Bb Rr
+      // H0 = bed; H1 = master's hot end; H2... = slave's hot ends
       if (code_seen('H'))
       {
-      	if(!code_value()){
-      	  //set BED thermistor
-      	  if(code_seen('B')) b_beta = code_value();
-      	  if(code_seen('R')) b_resistor = code_value();
-      	  if(code_seen('T')) b_thermistor = code_value();
-      	  b_inf = ( b_thermistor*exp(-b_beta/298.15) );
-		  SERIAL_PROTOCOL(MSG_OK);
-		  SERIAL_PROTOCOL(" M304 H0 B");
-		  SERIAL_PROTOCOL(b_beta);
-		  SERIAL_PROTOCOL(" R");
-		  SERIAL_PROTOCOL(b_resistor);
-		  SERIAL_PROTOCOL(" T");
-		  SERIAL_PROTOCOL(b_thermistor);
-		  SERIAL_PROTOCOLLN("");
-	    }else{
-	      //set active Nozzle thermistor
-      	  if(code_seen('B')) n_beta = code_value();
-      	  if(code_seen('R')) n_resistor = code_value();
-      	  if(code_seen('T')) n_thermistor = code_value();
-      	  n_inf = ( n_thermistor*exp(-n_beta/298.15) );
-		  SERIAL_PROTOCOL(MSG_OK);
-		  SERIAL_PROTOCOL(" M304 H1 B");
-		  SERIAL_PROTOCOL(n_beta);
-		  SERIAL_PROTOCOL(" R");
-		  SERIAL_PROTOCOL(n_resistor);
-		  SERIAL_PROTOCOL(" T");
-		  SERIAL_PROTOCOL(n_thermistor);
-		  SERIAL_PROTOCOLLN("");
-    	}
-      }
-    }
-    break;
+       float beta, resistor, thermistor, inf;
+       int hval = code_value();
+       getThermistor(hval, beta, resistor, thermistor, inf);
+       if(code_seen('B')) beta = code_value();
+       if(code_seen('R')) resistor = code_value();
+       if(code_seen('T')) thermistor = code_value();
+       setThermistor(hval, beta, resistor, thermistor, inf);
+       SERIAL_PROTOCOL(MSG_OK);
+       SERIAL_PROTOCOL(" M304 H");
+       SERIAL_PROTOCOL(hval);
+       SERIAL_PROTOCOL(" B");
+       SERIAL_PROTOCOL(beta);
+       SERIAL_PROTOCOL(" R");
+       SERIAL_PROTOCOL(resistor);
+       SERIAL_PROTOCOL(" T");
+       SERIAL_PROTOCOL(thermistor);
+       SERIAL_PROTOCOLLN("");
+      } 
+    break;    
+    
+ 
+    
     case 400: // M400 finish all moves
     {
       st_synchronize();
@@ -1435,25 +1561,21 @@ void process_commands()
     }
     break;
 #ifdef REPRAPPRO_MULTIMATERIALS    
-    case 555: // Slave comms test
-      talkToSlave("t 0");
-      SERIAL_ECHO_START;
-      SERIAL_ECHOPGM("Slave response:");
-      SERIAL_ECHO(listenToSlave());
+    case 555: // Slave heater test - extruder 1
+      slaveHeatTest(1);
       break;
-    case 556: // Set temp
-      talkToSlave("T 0 100");
+    case 556:  // Slave heater test - extruder 2
+      slaveHeatTest(2);
       break;
-    case 557:  // Call stepper test    
-      talkToSlave("A");
-      break;
-    case 558: // Send interrupt
-      for(int ii=0; ii < 1000; ii++)
-      {
-        toggleSlaveClock();
-        delay(1);
+    case 111:
+      if(code_seen('S'))
+      { 
+        if(code_value_int())
+          slaveDebug(true);
+        else
+          slaveDebug(false);
       }
-      break;    
+      break; 
 #endif
     }
   }
@@ -1461,70 +1583,113 @@ void process_commands()
   else if(code_seen('T')) 
   {
     tmp_extruder = code_value();
-    if(tmp_extruder >= EXTRUDERS) 
+    if(tmp_extruder < 0 || tmp_extruder >= EXTRUDERS) 
     {
       SERIAL_ECHO_START;
       SERIAL_ECHO(MSG_STANDBY_TEMP);
       SERIAL_ECHO(active_extruder);
       setTargetHotend(extruder_standby[active_extruder], active_extruder);
-    }
-    else 
-    {
-      if((tmp_extruder != active_extruder) || !extruder_selected)
-      {
-      setTargetHotend(extruder_standby[active_extruder], active_extruder);
-      extruder_selected = true;
+      extruder_selected = false;
+#ifdef REPRAPPRO_MULTIMATERIALS
+      slaveDrive(NO_DRIVE); // Sending a non-existent drive number will turn the current one off
+#endif  
+    } else 
+    { 
+      //if((tmp_extruder != active_extruder) || !extruder_selected)
+      //{
+         extruder_selected = true;
+         
+         for(int8_t i = 0; i < EXTRUDERS; i++)
+         {
+           if(i == tmp_extruder)
+             setTargetHotend(extruder_temperature[i], i);
+           else
+             setTargetHotend(extruder_standby[i], i);
+         }
+         codenum = millis();
+         wait_for_all_extruder_temps(); 
+         
+         // Deal with offsets here:  record current pos as temp_position; 
+         // move to temp_position + tmp_extruder - active_extruder; 
+         // Set current pos to be temp_position
+         // TOTHINKABOUT: What about cumulative errors with a LOT of extruder changes?
+         
+         for(int8_t i=0; i < NUM_AXIS; i++)
+           destination[i] = current_position[i];
+           
+         destination[X_AXIS] -= extruder_x_off[active_extruder];
+         destination[Y_AXIS] -= extruder_y_off[active_extruder];
+         destination[Z_AXIS] -= extruder_z_off[active_extruder];
+
+         next_feedrate = feedrate;    
       
-      // Deal with offsets here:  record current pos as temp_position; 
-      // move to temp_position + tmp_extruder - active_extruder; 
-      // Set current pos to be temp_position
-      // TOTHINKABOUT: What about cumulative errors with a LOT of extruder changes?
+         if(extruder_z_off[tmp_extruder] - extruder_z_off[active_extruder] > 0)
+         {
+           destination[Z_AXIS] += extruder_z_off[tmp_extruder];
+           feedrate = fast_home_feedrate[Z_AXIS];
+           prepare_move();
+           destination[X_AXIS] += extruder_x_off[tmp_extruder];
+           destination[Y_AXIS] += extruder_y_off[tmp_extruder];            
+           feedrate = fast_home_feedrate[X_AXIS];        
+           prepare_move();
+         } else
+         {
+           destination[X_AXIS] += extruder_x_off[tmp_extruder];
+           destination[Y_AXIS] += extruder_y_off[tmp_extruder];  
+           feedrate = fast_home_feedrate[X_AXIS];
+           prepare_move();
+           destination[Z_AXIS] += extruder_z_off[tmp_extruder];
+           feedrate = fast_home_feedrate[Z_AXIS];
+           prepare_move();      
+         }
+         st_synchronize();  // Wait for the moves to finish
+         active_extruder = tmp_extruder;
+         feedrate = next_feedrate;
+/*
+         next_feedrate = feedrate;
+         x_off_d = extruder_x_off[tmp_extruder] - extruder_x_off[active_extruder];
+         y_off_d = extruder_y_off[tmp_extruder] - extruder_y_off[active_extruder];
+         z_off_d = extruder_z_off[tmp_extruder] - extruder_z_off[active_extruder];      
       
-      for(int8_t i=0; i < NUM_AXIS; i++) 
-      {
-        temp_position[i] = current_position[i];
-        destination[i] = current_position[i];
-      }
-      next_feedrate = feedrate;
-      x_off_d = extruder_x_off[tmp_extruder] - extruder_x_off[active_extruder];
-      y_off_d = extruder_y_off[tmp_extruder] - extruder_y_off[active_extruder];
-      z_off_d = extruder_z_off[tmp_extruder] - extruder_z_off[active_extruder];      
-      
-      if(z_off_d > 0)
-      {
-        destination[Z_AXIS] += z_off_d;
-        feedrate = fast_home_feedrate[Z_AXIS];
-        prepare_move();
-        destination[X_AXIS] = temp_position[X_AXIS] + x_off_d;
-        destination[Y_AXIS] = temp_position[Y_AXIS] + y_off_d;
-        feedrate = fast_home_feedrate[X_AXIS];        
-        prepare_move();
-      } else
-      {
-        destination[X_AXIS] += x_off_d;
-        destination[Y_AXIS] += y_off_d;
-        feedrate = fast_home_feedrate[X_AXIS];
-        prepare_move();
-        destination[Z_AXIS] = temp_position[Z_AXIS] + z_off_d;
-        feedrate = fast_home_feedrate[Z_AXIS];
-        prepare_move();      
-      }
-      
-      for(int8_t i=0; i < NUM_AXIS; i++) 
-        current_position[i] = temp_position[i];
-      feedrate = next_feedrate;
-      active_extruder = tmp_extruder;
-      
-      SERIAL_ECHO_START;
-      SERIAL_ECHO(MSG_ACTIVE_EXTRUDER);
-      SERIAL_PROTOCOLLN((int)active_extruder);
-      
-      setTargetHotend(extruder_temperature[active_extruder], active_extruder);
-      
-      
-      codenum = millis(); 
-      wait_for_temp(active_extruder, codenum);
-      }
+         if(z_off_d > 0)
+         {
+           destination[Z_AXIS] += z_off_d;
+           feedrate = fast_home_feedrate[Z_AXIS];
+           prepare_move();
+           current_position[Z_AXIS] = temp_position[Z_AXIS];
+           plan_set_position(current_position[X_AXIS] - x_off_d, current_position[Y_AXIS] - y_off_d, current_position[Z_AXIS], current_position[E_AXIS]);  
+           destination[X_AXIS] = temp_position[X_AXIS];
+           destination[Y_AXIS] = temp_position[Y_AXIS];
+           feedrate = fast_home_feedrate[X_AXIS];        
+           prepare_move();
+         } else
+         {
+           plan_set_position(current_position[X_AXIS] - x_off_d, current_position[Y_AXIS] - y_off_d, current_position[Z_AXIS], current_position[E_AXIS]);  
+           destination[X_AXIS] = temp_position[X_AXIS];
+           destination[Y_AXIS] = temp_position[Y_AXIS];
+           feedrate = fast_home_feedrate[X_AXIS];
+           prepare_move();
+           destination[Z_AXIS] = temp_position[Z_AXIS] + z_off_d;
+           feedrate = fast_home_feedrate[Z_AXIS];
+           prepare_move();      
+         }
+         st_synchronize();  // Wait for the moves to finish, or it will overwrite current_position[] when it does
+         for(int8_t i=0; i < NUM_AXIS; i++) 
+           current_position[i] = temp_position[i];
+         plan_set_position(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);  
+         feedrate = next_feedrate;
+*/
+         active_extruder = tmp_extruder;
+#ifdef REPRAPPRO_MULTIMATERIALS
+         if(active_extruder > 0)
+            slaveDrive(active_extruder);
+         else
+           slaveDrive(NO_DRIVE); // Sending a non-existent drive number will turn the current one off
+#endif      
+         SERIAL_ECHO_START;
+         SERIAL_ECHO(MSG_ACTIVE_EXTRUDER);
+         SERIAL_PROTOCOLLN((int)active_extruder);
+    //  }
     }
   }
 
@@ -1561,9 +1726,22 @@ void ClearToSend()
 
 void get_coordinates()
 {
-  for(int8_t i=0; i < NUM_AXIS; i++) {
-    if(code_seen(axis_codes[i])) destination[i] = (float)code_value() + (axis_relative_modes[i] || relative_mode)*current_position[i];
-    else destination[i] = current_position[i]; //Are these else lines really needed?
+  for(int8_t i=0; i < NUM_AXIS; i++) 
+  {
+    if(code_seen(axis_codes[i]))
+    {
+      destination[i] = (float)code_value() + (axis_relative_modes[i] || relative_mode)*current_position[i];
+      if(!(axis_relative_modes[i] || relative_mode))
+      {
+        if(i == X_AXIS)
+          destination[X_AXIS] += extruder_x_off[active_extruder];
+        if(i == Y_AXIS)
+          destination[Y_AXIS] += extruder_y_off[active_extruder];
+        if(i == Z_AXIS)
+          destination[Z_AXIS] += extruder_z_off[active_extruder];
+      }
+    } else 
+      destination[i] = current_position[i]; //Are these else lines really needed?
   }
   if(code_seen('F')) {
     next_feedrate = code_value();
@@ -1665,11 +1843,17 @@ void controllerFan()
 }
 #endif
 
+// This is called in a tight loop.  No need for that; once every five seconds should do - AB
+
 void manage_inactivity(byte debug) 
 { 
+  if((long)(inactivity_time - millis()) > 0)
+    return;
+  inactivity_time += 5000ul;
+ 
   if( (millis() - previous_millis_cmd) >  max_inactive_time ) 
     if(max_inactive_time) 
-      kill(); 
+      Stop(); 
   if(stepper_inactive_time)  {
     if( (millis() - previous_millis_cmd) >  stepper_inactive_time ) 
     {
@@ -1689,18 +1873,22 @@ void manage_inactivity(byte debug)
   check_axes_activity();
 }
 
+// Absolute shutdown and die
+
 void kill()
 {
   cli(); // Stop interrupts
   disable_heater();
-
+  extruder_selected = false;
   disable_x();
   disable_y();
   disable_z();
   disable_e0();
   disable_e1();
   disable_e2();
-  
+#ifdef REPRAPPRO_MULTIMATERIALS
+  stopSlave();
+#endif  
   SERIAL_ERROR_START;
   SERIAL_ERRORLNPGM(MSG_ERR_KILLED);
   LCD_MESSAGEPGM(MSG_KILLED);
@@ -1708,9 +1896,30 @@ void kill()
   while(1); // Wait for reset
 }
 
+// Shutdown nicely when told to do so
+
+void shutDown()
+{
+  st_synchronize();
+  disable_heater();
+  extruder_selected = false;
+  disable_x();
+  disable_y();
+  disable_z();
+  disable_e0();
+  disable_e1();
+  disable_e2();  
+#ifdef REPRAPPRO_MULTIMATERIALS
+  stopSlave();
+#endif
+}
+
+// Error shutdown
+
 void Stop()
 {
   disable_heater();
+  extruder_selected = false;
   if(Stopped == false) {
     Stopped = true;
     Stopped_gcode_LastN = gcode_LastN; // Save last g_code for restart
@@ -1718,6 +1927,9 @@ void Stop()
     SERIAL_ERRORLNPGM(MSG_ERR_STOPPED);
     LCD_MESSAGEPGM(MSG_STOPPED);
   }
+#ifdef REPRAPPRO_MULTIMATERIALS
+  stopSlave();
+#endif
 }
 
 bool IsStopped() { return Stopped; };
