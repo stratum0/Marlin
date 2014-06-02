@@ -45,7 +45,7 @@ void clearSlaveChannel();
 void talkToSlave(char s[]);
 char* listenToSlave();
 void setup_slave();
-char* ftoa(char *a, const float& f, int prec);
+char* ftoa(char *a, float f, byte prec);
 
 FORCE_INLINE float getFloatFromSlave(uint8_t device, char command)
 {
@@ -126,7 +126,7 @@ FORCE_INLINE void setSlaveExtruderThermistor(int8_t heater, const float& b, cons
 	talkToSlave(slaveXmitBuffer);
         delay(1);
         slaveXmitBuffer[0] = SET_I;
-        ftoa(&slaveXmitBuffer[2], i, 4);
+        ftoa(&slaveXmitBuffer[2], i, 6);
 	talkToSlave(slaveXmitBuffer);
 }
 

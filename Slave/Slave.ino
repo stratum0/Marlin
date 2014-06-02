@@ -105,7 +105,7 @@ void setup()
   DEBUG_IO.print("\nRepRapPro slave controller Version ");
   DEBUG_IO.print(VERSION_DATE);
   DEBUG_IO.print(" restarted.\n Temps:");
-  debug = false;
+  debug = true;
   MASTER.begin(BAUD); 
   bp = 0;
 
@@ -190,17 +190,21 @@ inline void error(boolean fatal, char* s)
   errorStopped = true;
 }
 
+/*
 char* ftoa(char *a, const float& f, int prec)
 {
-  char *ret = a;
-  long whole = (long)f;
-  itoa(whole, a, 10);
-  while (*a != '\0') a++;
-  *a++ = '.';
-  long decimal = abs((long)((f - (float)whole) * precision[prec]));
-  itoa(decimal, a, 10);
-  return ret;
+   char *ret = a;
+   long whole = (long)f;
+   if(!whole && f < 0.0)
+     *a++ = '-';
+   itoa(whole, a, 10);
+   while (*a != '\0') a++;
+   *a++ = '.';
+   long decimal = abs((long)((f - (float)whole) * precision[prec]));
+   itoa(decimal, a, 10);
+   return ret;
 }
+*/
 
 inline void debugMessage(char* s1)
 {
