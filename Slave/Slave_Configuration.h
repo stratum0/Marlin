@@ -12,7 +12,7 @@
 
 #define REPRAPPRO_MULTIMATERIALS
 
-#define VERSION_DATE "1.1, 2013-05-15"
+#define VERSION_DATE "1.2, 2014-06-02"
 
 #include "slaveCommands.h"
 
@@ -85,7 +85,7 @@
 
 
 // RS 198-961
-#define TH_BETA 3960.0
+#define TH_BETA 4138.0
 #define TH_RS 4700.0
 #define TH_R_INF ( 100000.0*exp(-TH_BETA/298.15) )
 

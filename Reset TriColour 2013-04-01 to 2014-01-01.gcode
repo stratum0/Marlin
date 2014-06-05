@@ -1,7 +1,15 @@
+; Mendel Tricolour from 1/4/2013 to 1/1/2014
+;
+; Settings:
+; Bed thermistor: Rapid 61-0446 ; Semitec 103GT-2 - B4126 T10000
+; Hot end thermistor: RS 198-961 100k ohm 10% DO-35 NTC thermistor - B3960 T100000
+; Black rubber belt (MXL), 17-tooth printed pulley: 92.635 step per mm
+; Extruder: 660 steps per mm
+
 M502
 M92 X92.635 Y92.635 Z4000.00 E660.00
-M203 X500.00 Y500.00 Z5.00 E45.00
-M201 X1000 Y1000 Z50 E250
+M203 X300.00 Y300.00 Z5.00 E45.00
+M201 X800 Y800 Z50 E800
 M204 S1000.00 T1000.00
 M205 S0.00 T0.00 B20000 X15.00 Z0.40 E15.00
 M206 X0.00 Y0.00 Z0.00

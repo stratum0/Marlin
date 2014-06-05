@@ -21,6 +21,9 @@
 #define SLAVE_TIMEOUT 4
 #define SLAVE_OVERFLOW 8
 
+#define COMMS_PAUSE 3 // ms
+#define SHORT_PAUSE 1 // ms
+
         
 extern char slaveXmitBuffer[];
 extern char slaveRcvBuffer[];
@@ -45,7 +48,7 @@ void clearSlaveChannel();
 void talkToSlave(char s[]);
 char* listenToSlave();
 void setup_slave();
-char* ftoa(char *a, const float& f, int prec);
+char* ftoa(char *a, float f, byte prec);
 
 FORCE_INLINE float getFloatFromSlave(uint8_t device, char command)
 {
@@ -84,12 +87,13 @@ FORCE_INLINE float slaveDegTargetHotend(uint8_t heater)
 FORCE_INLINE void getSlavePIDValues(int e, float &Kpi, float &Kii, float &Kdi, float &Kmi)
 {
   Kpi = getFloatFromSlave(e, GET_KP);
-  delay(1);
+  delay(SHORT_PAUSE);
   Kii = getFloatFromSlave(e, GET_KI);
-  delay(1);
+  delay(SHORT_PAUSE);
   Kdi = getFloatFromSlave(e, GET_KD);
-  delay(1);
+  delay(SHORT_PAUSE);
   Kmi = getFloatFromSlave(e, GET_KW);
+  delay(SHORT_PAUSE);
 }
 
 FORCE_INLINE void setSlavePIDValues(int e, const float &Kpi, const float &Kii, const float &Kdi, const float &Kmi)
@@ -98,18 +102,19 @@ FORCE_INLINE void setSlavePIDValues(int e, const float &Kpi, const float &Kii, c
   slaveXmitBuffer[1] = '0' + e - 1; // Our extruder 0 is the Master's extruder; slave's e0 is our e1
   ftoa(&slaveXmitBuffer[2], Kpi, 4); 
   talkToSlave(slaveXmitBuffer);
-  delay(1);
+  delay(COMMS_PAUSE);
   slaveXmitBuffer[0] = SET_KI;
   ftoa(&slaveXmitBuffer[2], Kii, 4); 
   talkToSlave(slaveXmitBuffer);
-  delay(1);
+  delay(COMMS_PAUSE);
   slaveXmitBuffer[0] = SET_KD;
   ftoa(&slaveXmitBuffer[2], Kdi, 4); 
   talkToSlave(slaveXmitBuffer);
-  delay(1);
+  delay(COMMS_PAUSE);
   slaveXmitBuffer[0] = SET_KW;
   ftoa(&slaveXmitBuffer[2], Kmi, 4); 
-  talkToSlave(slaveXmitBuffer);  
+  talkToSlave(slaveXmitBuffer);
+  delay(COMMS_PAUSE); 
 }
 
 
@@ -120,14 +125,15 @@ FORCE_INLINE void setSlaveExtruderThermistor(int8_t heater, const float& b, cons
         slaveXmitBuffer[1] = '0' + heater - 1; // Our extruder 0 is the Master's extruder; slave's e0 is our e1
         ftoa(&slaveXmitBuffer[2], b, 1);
 	talkToSlave(slaveXmitBuffer);
-        delay(1);
+        delay(COMMS_PAUSE);
         slaveXmitBuffer[0] = SET_R;
         ftoa(&slaveXmitBuffer[2], r, 1);
 	talkToSlave(slaveXmitBuffer);
-        delay(1);
+        delay(COMMS_PAUSE);
         slaveXmitBuffer[0] = SET_I;
-        ftoa(&slaveXmitBuffer[2], i, 4);
+        ftoa(&slaveXmitBuffer[2], i, 6);
 	talkToSlave(slaveXmitBuffer);
+        delay(COMMS_PAUSE);
 }
 
 FORCE_INLINE float getSlaveExtruderBeta(int8_t e)
@@ -145,16 +151,6 @@ FORCE_INLINE float getSlaveExtruderRInf(int8_t e)
   return getFloatFromSlave(e, GET_I);
 }
 
-// Dunno what these are for...
-/*FORCE_INLINE bool slaveIsHeatingHotend(uint8_t heater) 
-{ 
-	return slaveDegHotend(heater) < slaveDegTargetHotend(heater); 
-}
-
-FORCE_INLINE bool  slaveIsCoolingHotend(uint8_t heater) 
-{ 
-	return !slaveIsHeatingHotend(heater) ; 
-}*/
 
 FORCE_INLINE void slaveHeatTest(uint8_t heater)
 {
@@ -188,7 +184,7 @@ FORCE_INLINE void slaveDir(uint8_t drive, boolean forward)
 	slaveXmitBuffer[2] = 0;
 	talkToSlave(slaveXmitBuffer);
         setDir[drive] = forward;
-        delay(1); // Give it a moment
+        delay(SHORT_PAUSE); // Give it a moment
 }
 
 FORCE_INLINE void slaveDrive(uint8_t drive)
@@ -248,7 +244,7 @@ FORCE_INLINE void clearSlaveChannel()
   firstTalk = false;
   for(uint8_t i = 0; i < 10; i++)
   {
-    delay(1);
+    delay(COMMS_PAUSE);;
     MYSERIAL1.print(END_C);
   }
   listenToSlave(); // Clear junk from input
