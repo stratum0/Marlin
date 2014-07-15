@@ -22,7 +22,7 @@
 //#define SERIAL_R 10000
 
 // Uncomment the next line if your machine has more than one extruder
-#define REPRAPPRO_MULTIMATERIALS
+//#define REPRAPPRO_MULTIMATERIALS
 
 
 
